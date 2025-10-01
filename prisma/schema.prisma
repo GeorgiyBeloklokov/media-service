@@ -1,0 +1,37 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum MediaStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model Media {
+  id          Int       @id @default(autoincrement())
+  uploaderId  Int
+  name        String
+  description String?
+  mimeType    String
+  size        Int
+  width       Int?
+  height      Int?
+  duration    Int?      @map("durationSeconds")
+  originalUrl String
+  thumbnails  Json?
+  status      MediaStatus @default(PENDING)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime?
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([uploaderId])
+}

@@ -1,0 +1,141 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_REGION: ${MINIO_REGION}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+  localstack:
+    image: localstack/localstack:latest
+    restart: always
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      SERVICES: s3,sqs
+      DEFAULT_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      DEBUG: 1
+    volumes:
+      - localstack-data:/var/lib/localstack
+    command: >
+      sh -c "
+        /usr/bin/localstack start -d & 
+        sleep 10; 
+        awslocal sqs create-queue --queue-name ${SQS_QUEUE_NAME} --attributes '{\"FifoQueue\":\"true\", \"ContentBasedDeduplication\":\"true\"}'; 
+        awslocal sqs create-queue --queue-name ${SQS_DLQ_QUEUE_NAME} --attributes '{\"FifoQueue\":\"true\", \"ContentBasedDeduplication\":\"true\"}'; 
+        awslocal sqs set-queue-attributes --queue-url http://localstack:4566/000000000000/${SQS_QUEUE_NAME} --attributes '{\"RedrivePolicy\":\"{\\\"deadLetterTargetArn\\\":\\\"arn:aws:sqs:${AWS_REGION}:000000000000:${SQS_DLQ_QUEUE_NAME}\\\",\\\"maxReceiveCount\\\":\\\"3\\\"}\"}';
+        wait 
+      "
+
+  imagorvideo:
+    image: ghcr.io/cshum/imagorvideo:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      IMAGOR_BASE_URL: ${MINIO_ENDPOINT}/${MINIO_BUCKET}
+      IMAGOR_S3_REGION: ${MINIO_REGION}
+      IMAGOR_S3_ENDPOINT: ${MINIO_ENDPOINT}
+      IMAGOR_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      IMAGOR_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      IMAGOR_S3_BUCKET: ${MINIO_BUCKET}
+    command: --port=8080
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_REGION: ${MINIO_REGION}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      SQS_ENDPOINT: http://localstack:4566
+      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME}
+      IMAGORVIDEO_URL: http://imagorvideo:8080
+      PORT: ${PORT}
+      MAX_FILE_SIZE_IMAGE_MB: ${MAX_FILE_SIZE_IMAGE_MB}
+      MAX_FILE_SIZE_VIDEO_MB: ${MAX_FILE_SIZE_VIDEO_MB}
+      MAX_IMAGE_WIDTH: ${MAX_IMAGE_WIDTH}
+      MAX_IMAGE_HEIGHT: ${MAX_IMAGE_HEIGHT}
+      THUMBNAIL_SIZES: ${THUMBNAIL_SIZES}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      localstack:
+        condition: service_started
+      imagorvideo:
+        condition: service_started
+    restart: on-failure
+    command: ["node", "dist/src/main.js"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_REGION: ${MINIO_REGION}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      SQS_ENDPOINT: http://localstack:4566
+      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME}
+      IMAGORVIDEO_URL: http://imagorvideo:8080
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      localstack:
+        condition: service_started
+      imagorvideo:
+        condition: service_started
+    restart: on-failure
+    command: ["node", "dist/worker/index.js"]
+
+volumes:
+  db-data:
+  minio-data:
+  localstack-data:
