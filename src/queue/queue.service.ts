@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SQSClient, SendMessageCommand, ReceiveMessageCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
+import {
+  SQSClient,
+  SendMessageCommand,
+  ReceiveMessageCommand,
+  DeleteMessageCommand,
+} from '@aws-sdk/client-sqs';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 
 interface QueueMessage {
   jobId: string;
@@ -19,37 +25,72 @@ export class QueueService {
 
   constructor(private readonly configService: ConfigService) {
     const region = this.configService.get<string>('AWS_REGION', 'us-east-1');
-    const endpoint = this.configService.get<string>('SQS_ENDPOINT', 'http://localstack:4566');
-    this.queueUrl = this.configService.get<string>('SQS_QUEUE_NAME', 'media-tasks.fifo');
+    const endpoint = this.configService.get<string>(
+      'SQS_ENDPOINT',
+      'http://localstack:4566',
+    );
+    this.queueUrl = this.configService.get<string>(
+      'SQS_QUEUE_NAME',
+      'media-tasks.fifo',
+    );
 
     this.sqsClient = new SQSClient({
       region: region,
       endpoint: endpoint,
       credentials: {
-        accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID', 'test'),
-        secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY', 'test'),
+        accessKeyId: this.configService.get<string>(
+          'AWS_ACCESS_KEY_ID',
+          'test',
+        ),
+        secretAccessKey: this.configService.get<string>(
+          'AWS_SECRET_ACCESS_KEY',
+          'test',
+        ),
       },
     });
   }
 
+  private makeDeduplicationId(input: string): string {
+    // Хэшируем строку в sha256 и берем первые 128 символов
+    return createHash('sha256').update(input).digest('hex').slice(0, 128);
+  }
+
   async enqueue(message: QueueMessage): Promise<void> {
-    const command = new SendMessageCommand({
+    const isFifo = this.queueUrl.endsWith('.fifo');
+
+    const params: any = {
       QueueUrl: this.queueUrl,
       MessageBody: JSON.stringify(message),
-      // MessageGroupId: message.mediaId.toString(), // For FIFO queues
-      // MessageDeduplicationId: message.jobId, // For FIFO queues
-    });
+    };
+
+    if (isFifo) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      params.MessageGroupId = message.mediaId.toString();
+      // безопасный DeduplicationId: хэшируем jobId и берем первые 128 символов
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      params.MessageDeduplicationId = createHash('sha256')
+        .update(message.jobId)
+        .digest('hex')
+        .slice(0, 128);
+    }
 
     try {
-      await this.sqsClient.send(command);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      await this.sqsClient.send(new SendMessageCommand(params));
       this.logger.log(`Message enqueued for mediaId: ${message.mediaId}`);
     } catch (error) {
-      this.logger.error(`Failed to enqueue message for mediaId ${message.mediaId}: ${error.message}`);
+      this.logger.error(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        `Failed to enqueue message for mediaId ${message.mediaId}: ${error.message}`,
+      );
       throw error;
     }
   }
 
-  async pullMessages(maxNumberOfMessages: number = 10, visibilityTimeout: number = 30): Promise<any[]> {
+  async pullMessages(
+    maxNumberOfMessages: number = 10,
+    visibilityTimeout: number = 30,
+  ): Promise<any[]> {
     const command = new ReceiveMessageCommand({
       QueueUrl: this.queueUrl,
       MaxNumberOfMessages: maxNumberOfMessages,
@@ -61,13 +102,15 @@ export class QueueService {
       const { Messages } = await this.sqsClient.send(command);
       if (Messages && Messages.length > 0) {
         this.logger.log(`Received ${Messages.length} messages from queue.`);
-        return Messages.map(msg => ({
+        return Messages.map((msg) => ({
           ...msg,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           Body: msg.Body ? JSON.parse(msg.Body) : undefined,
         }));
       }
       return [];
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       this.logger.error(`Failed to pull messages from queue: ${error.message}`);
       throw error;
     }
@@ -83,7 +126,10 @@ export class QueueService {
       await this.sqsClient.send(command);
       this.logger.log(`Message deleted with receipt handle: ${receiptHandle}`);
     } catch (error) {
-      this.logger.error(`Failed to delete message with receipt handle ${receiptHandle}: ${error.message}`);
+      this.logger.error(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        `Failed to delete message with receipt handle ${receiptHandle}: ${error.message}`,
+      );
       throw error;
     }
   }

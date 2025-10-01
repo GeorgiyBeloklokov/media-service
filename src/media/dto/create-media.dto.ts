@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, Min, Max, IsNumber, IsMimeType } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  Min,
+  IsMimeType,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -45,7 +52,9 @@ export class CreateMediaDto {
   @Type(() => Number)
   height?: number;
 
-  @ApiPropertyOptional({ description: 'Длительность видео в секундах (для видео)' })
+  @ApiPropertyOptional({
+    description: 'Длительность видео в секундах (для видео)',
+  })
   @IsOptional()
   @IsInt()
   @Min(0)

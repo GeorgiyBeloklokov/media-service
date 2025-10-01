@@ -44,15 +44,7 @@ services:
       DEBUG: 1
     volumes:
       - localstack-data:/var/lib/localstack
-    command: >
-      sh -c "
-        /usr/bin/localstack start -d & 
-        sleep 10; 
-        awslocal sqs create-queue --queue-name ${SQS_QUEUE_NAME} --attributes '{\"FifoQueue\":\"true\", \"ContentBasedDeduplication\":\"true\"}'; 
-        awslocal sqs create-queue --queue-name ${SQS_DLQ_QUEUE_NAME} --attributes '{\"FifoQueue\":\"true\", \"ContentBasedDeduplication\":\"true\"}'; 
-        awslocal sqs set-queue-attributes --queue-url http://localstack:4566/000000000000/${SQS_QUEUE_NAME} --attributes '{\"RedrivePolicy\":\"{\\\"deadLetterTargetArn\\\":\\\"arn:aws:sqs:${AWS_REGION}:000000000000:${SQS_DLQ_QUEUE_NAME}\\\",\\\"maxReceiveCount\\\":\\\"3\\\"}\"}';
-        wait 
-      "
+    command: /usr/bin/localstack start -d       
 
   imagorvideo:
     image: ghcr.io/cshum/imagorvideo:latest
@@ -60,12 +52,15 @@ services:
     ports:
       - "8080:8080"
     environment:
-      IMAGOR_BASE_URL: ${MINIO_ENDPOINT}/${MINIO_BUCKET}
+      IMAGOR_BASE_URL: ${MINIO_ENDPOINT}
       IMAGOR_S3_REGION: ${MINIO_REGION}
       IMAGOR_S3_ENDPOINT: ${MINIO_ENDPOINT}
       IMAGOR_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       IMAGOR_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       IMAGOR_S3_BUCKET: ${MINIO_BUCKET}
+      # включаем сохранение результатов
+      IMAGOR_STORAGE_RESULT_STORAGE: s3
+      IMAGOR_RESULT_STORAGE_PATH_STYLE: true  
     command: --port=8080
 
   backend:

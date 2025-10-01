@@ -46,16 +46,24 @@ export class MediaResponseDto {
   @ApiPropertyOptional({ description: 'Высота изображения (для изображений)' })
   height?: number | null;
 
-  @ApiPropertyOptional({ description: 'Длительность видео в секундах (для видео)' })
+  @ApiPropertyOptional({
+    description: 'Длительность видео в секундах (для видео)',
+  })
   duration?: number | null;
 
   @ApiProperty({ description: 'URL оригинального файла' })
   originalUrl: string;
 
-  @ApiPropertyOptional({ type: [ThumbnailResponseDto], description: 'Массив миниатюр с URL и метаданными' })
+  @ApiPropertyOptional({
+    type: [ThumbnailResponseDto],
+    description: 'Массив миниатюр с URL и метаданными',
+  })
   thumbnails?: ThumbnailResponseDto[] | null;
 
-  @ApiProperty({ enum: MediaStatus, description: 'Статус обработки медиафайла' })
+  @ApiProperty({
+    enum: MediaStatus,
+    description: 'Статус обработки медиафайла',
+  })
   status: MediaStatus;
 
   @ApiProperty({ description: 'Дата и время создания записи' })
