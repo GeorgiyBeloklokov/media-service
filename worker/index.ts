@@ -223,7 +223,7 @@ class Worker {
       for (const { width, height } of requestedThumbnailSizes) {
         const thumbnailKey = `media/thumbnails/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${mediaId}-${width}x${height}${path.extname(objectKey)}`;
 
-        // Use ImagorVideo with full MinIO URL since S3 loader configuration has issues
+        // Use ImagorVideo with full MinIO URL (public bucket access required for development)
         const fullMinioUrl = `${this.minioEndpoint}/${this.bucketName}/${objectKey}`;
         const imagorVideoEndpoint = `${this.imagorVideoUrl}/unsafe/${width}x${height}/${fullMinioUrl}`;
 
