@@ -9,7 +9,7 @@ import {
   SQSClient,
 } from '@aws-sdk/client-sqs';
 import { Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import * as path from 'path';
 
@@ -20,6 +20,31 @@ interface WorkerQueueMessage {
   mimeType: string;
   requestedThumbnailSizes: { width: number; height: number }[];
   retryCount: number;
+}
+
+interface MediaRecord {
+  id: number;
+  status: string;
+  uploaderId: number;
+  name: string;
+  description?: string;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
+  duration?: number;
+  originalUrl: string;
+  thumbnails?: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  processedAt?: Date;
+}
+
+interface ThumbnailData {
+  url: string;
+  width: number;
+  height: number;
+  mimeType: string;
 }
 
 async function fetchWithRetry<T>(
@@ -108,8 +133,7 @@ class Worker {
                 );
                 continue;
               }
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              const body: WorkerQueueMessage = JSON.parse(message.Body);
+              const body = JSON.parse(message.Body) as WorkerQueueMessage;
               this.logger.log(
                 `Processing message for mediaId: ${body.mediaId}, jobId: ${body.jobId}`,
               );
@@ -117,8 +141,9 @@ class Worker {
             }
           }
         } catch (error) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          this.logger.error(`Error during polling: ${error.message}`);
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          this.logger.error(`Error during polling: ${errorMessage}`);
           // If an error occurs during polling, we should log it and allow the loop to continue
           // However, if the error is persistent, the container should ideally restart to clear state.
           // For now, we'll log and continue. If the error is critical, restart policy of docker-compose will handle it.
@@ -126,9 +151,10 @@ class Worker {
         await new Promise((resolve) => setTimeout(resolve, 5000)); // Poll every 5 seconds
       }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Unhandled error in startPolling: ${error.message}. Exiting worker.`,
+        `Unhandled error in startPolling: ${errorMessage}. Exiting worker.`,
       );
       // Exit with a non-zero code so Docker Compose can restart the container if restart policy is set.
       process.exit(1);
@@ -142,10 +168,9 @@ class Worker {
     const { mediaId, objectKey, requestedThumbnailSizes, jobId } = message;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      const existingMedia = await this.prisma.media.findUnique({
+      const existingMedia = (await this.prisma.media.findUnique({
         where: { id: mediaId },
-      });
+      })) as MediaRecord | null;
 
       if (!existingMedia) {
         this.logger.warn(
@@ -160,10 +185,8 @@ class Worker {
         return;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (existingMedia.status !== 'PENDING') {
         this.logger.warn(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           `Media ${mediaId} is already in status ${existingMedia.status}. Skipping processing for jobId: ${jobId}`,
         );
         await this.sqsClient.send(
@@ -176,7 +199,6 @@ class Worker {
       }
 
       // Update media status to PROCESSING
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this.prisma.media.update({
         where: { id: mediaId },
         data: { status: 'PROCESSING' },
@@ -196,20 +218,17 @@ class Worker {
 
       this.logger.log(`Original file downloaded: ${objectKey}`);
 
-      const thumbnails: {
-        url: string;
-        width: number;
-        height: number;
-        mimeType: string;
-      }[] = [];
+      const thumbnails: ThumbnailData[] = [];
 
       for (const { width, height } of requestedThumbnailSizes) {
         const thumbnailKey = `media/thumbnails/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${mediaId}-${width}x${height}${path.extname(objectKey)}`;
-        const imageUrl = `${this.minioEndpoint}/${this.bucketName}/${objectKey}`;
-        const imagorVideoEndpoint = `${this.imagorVideoUrl}/unsafe/${width}x${height}/${imageUrl}`;
+
+        // Use ImagorVideo with full MinIO URL since S3 loader configuration has issues
+        const fullMinioUrl = `${this.minioEndpoint}/${this.bucketName}/${objectKey}`;
+        const imagorVideoEndpoint = `${this.imagorVideoUrl}/unsafe/${width}x${height}/${fullMinioUrl}`;
 
         this.logger.log(
-          `Generating thumbnail for ${objectKey} with ImagorVideo: ${imagorVideoEndpoint}`,
+          `Generating thumbnail for ${objectKey} with ImagorVideo at: ${imagorVideoEndpoint}`,
         );
 
         const thumbnailResponse = await fetchWithRetry(() =>
@@ -218,9 +237,12 @@ class Worker {
           }),
         );
 
-        const thumbnailBuffer = Buffer.from(thumbnailResponse.data);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const thumbnailMimeType = thumbnailResponse.headers['content-type'];
+        const thumbnailBuffer = Buffer.from(
+          thumbnailResponse.data as ArrayBuffer,
+        );
+        const thumbnailMimeType = thumbnailResponse.headers[
+          'content-type'
+        ] as string;
 
         await fetchWithRetry(() =>
           this.s3Client.send(
@@ -228,7 +250,6 @@ class Worker {
               Bucket: this.bucketName,
               Key: thumbnailKey,
               Body: thumbnailBuffer,
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               ContentType: thumbnailMimeType,
             }),
           ),
@@ -239,18 +260,16 @@ class Worker {
           url: thumbnailKey,
           width,
           height,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           mimeType: thumbnailMimeType,
         });
       }
 
       // Update media status to READY and save thumbnails
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this.prisma.media.update({
         where: { id: mediaId },
         data: {
           status: 'READY',
-          thumbnails: thumbnails,
+          thumbnails: thumbnails as unknown as Prisma.InputJsonValue,
           processedAt: new Date(),
         },
       });
@@ -265,11 +284,11 @@ class Worker {
       );
       this.logger.log(`SQS message deleted for mediaId: ${mediaId}`);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Failed to process message for mediaId ${mediaId}: ${error.message}`,
+        `Failed to process message for mediaId ${mediaId}: ${errorMessage}`,
       );
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this.prisma.media.update({
         where: { id: mediaId },
         data: { status: 'FAILED' },
@@ -280,7 +299,6 @@ class Worker {
 
   async onApplicationShutdown() {
     this.logger.log('Shutting down worker...');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this.prisma.$disconnect();
     this.logger.log('Prisma client disconnected.');
   }

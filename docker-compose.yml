@@ -7,11 +7,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,8 +20,8 @@ services:
     image: minio/minio
     restart: always
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -34,8 +34,8 @@ services:
     image: localstack/localstack:latest
     restart: always
     ports:
-      - "4566:4566"
-      - "4510-4559:4510-4559"
+      - '4566:4566'
+      - '4510-4559:4510-4559'
     environment:
       SERVICES: s3,sqs
       DEFAULT_REGION: ${AWS_REGION}
@@ -44,23 +44,62 @@ services:
       DEBUG: 1
     volumes:
       - localstack-data:/var/lib/localstack
-    command: /usr/bin/localstack start -d       
+    command: /usr/bin/localstack start -d
+
+  queue-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - localstack
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_REGION}
+    volumes:
+      - ./scripts:/scripts
+    entrypoint: ['/bin/sh']
+    command: ['/scripts/init-localstack.sh']
+    restart: 'no'
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+    volumes:
+      - ./scripts:/scripts
+    entrypoint: ['/bin/sh']
+    command: ['/scripts/init-minio.sh']
+    restart: 'no'
 
   imagorvideo:
     image: ghcr.io/cshum/imagorvideo:latest
     restart: always
     ports:
-      - "8080:8080"
+      - '8080:8080'
     environment:
-      IMAGOR_BASE_URL: ${MINIO_ENDPOINT}
-      IMAGOR_S3_REGION: ${MINIO_REGION}
-      IMAGOR_S3_ENDPOINT: ${MINIO_ENDPOINT}
-      IMAGOR_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      IMAGOR_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      IMAGOR_S3_BUCKET: ${MINIO_BUCKET}
-      # включаем сохранение результатов
+      IMAGOR_UNSAFE: 1
+      # S3 loader — откуда брать оригиналы
+      IMAGOR_S3_LOADER_BUCKET: ${MINIO_BUCKET}
+      IMAGOR_S3_LOADER_REGION: ${MINIO_REGION}
+      IMAGOR_S3_LOADER_ENDPOINT: ${MINIO_ENDPOINT}
+      IMAGOR_S3_LOADER_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      IMAGOR_S3_LOADER_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      IMAGOR_S3_LOADER_PATH_STYLE: true
+      # куда сохранять результаты (тоже в S3)
       IMAGOR_STORAGE_RESULT_STORAGE: s3
-      IMAGOR_RESULT_STORAGE_PATH_STYLE: true  
+      IMAGOR_RESULT_STORAGE_PATH_STYLE: true
+      IMAGOR_S3_STORAGE_BUCKET: ${MINIO_BUCKET}
+      IMAGOR_S3_STORAGE_REGION: ${MINIO_REGION}
+      IMAGOR_S3_STORAGE_ENDPOINT: ${MINIO_ENDPOINT}
+      IMAGOR_S3_STORAGE_PATH_STYLE: true
+      # MinIO credentials
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      - minio
     command: --port=8080
 
   backend:
@@ -68,7 +107,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       MINIO_ENDPOINT: http://minio:9000
@@ -97,8 +136,12 @@ services:
         condition: service_started
       imagorvideo:
         condition: service_started
+      queue-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     restart: on-failure
-    command: ["node", "dist/src/main.js"]
+    command: ['node', 'dist/src/main.js']
 
   worker:
     build:
@@ -127,8 +170,12 @@ services:
         condition: service_started
       imagorvideo:
         condition: service_started
+      queue-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     restart: on-failure
-    command: ["node", "dist/worker/index.js"]
+    command: ['node', 'dist/worker/index.js']
 
 volumes:
   db-data:

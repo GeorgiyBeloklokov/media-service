@@ -94,7 +94,7 @@ export class MediaService {
     }
 
     const fileExtension = path.extname(file.originalname);
-    const objectKey = `media/originals/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${uuidv4()}${fileExtension}`;
+    const objectKey = `originals/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${uuidv4()}${fileExtension}`;
 
     let originalWidth = width;
     let originalHeight = height;

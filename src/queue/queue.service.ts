@@ -29,10 +29,11 @@ export class QueueService {
       'SQS_ENDPOINT',
       'http://localstack:4566',
     );
-    this.queueUrl = this.configService.get<string>(
+    const queueName = this.configService.get<string>(
       'SQS_QUEUE_NAME',
-      'media-tasks.fifo',
+      'media-tasks',
     );
+    this.queueUrl = `${endpoint}/000000000000/${queueName}`;
 
     this.sqsClient = new SQSClient({
       region: region,
@@ -56,26 +57,12 @@ export class QueueService {
   }
 
   async enqueue(message: QueueMessage): Promise<void> {
-    const isFifo = this.queueUrl.endsWith('.fifo');
-
-    const params: any = {
+    const params = {
       QueueUrl: this.queueUrl,
       MessageBody: JSON.stringify(message),
     };
 
-    if (isFifo) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      params.MessageGroupId = message.mediaId.toString();
-      // безопасный DeduplicationId: хэшируем jobId и берем первые 128 символов
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      params.MessageDeduplicationId = createHash('sha256')
-        .update(message.jobId)
-        .digest('hex')
-        .slice(0, 128);
-    }
-
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await this.sqsClient.send(new SendMessageCommand(params));
       this.logger.log(`Message enqueued for mediaId: ${message.mediaId}`);
     } catch (error) {
