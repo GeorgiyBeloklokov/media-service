@@ -141,7 +141,6 @@ services:
       minio-init:
         condition: service_completed_successfully
     restart: on-failure
-    command: ['node', 'dist/src/main.js']
 
   worker:
     build:

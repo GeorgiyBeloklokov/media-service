@@ -12,4 +12,6 @@ RUN npx prisma generate
 
 RUN npm run build
 
-CMD ["node", "dist/src/main.js"]
+COPY scripts/init-db.js ./scripts/
+
+CMD ["sh", "-c", "node scripts/init-db.js && node dist/src/main.js"]
