@@ -1,98 +1,237 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Media Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A comprehensive media processing service built with NestJS that handles file uploads, storage, and asynchronous media processing with thumbnail generation.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Features
 
-## Description
+- File upload with validation (images: JPEG, PNG, GIF up to 10MB; videos: MP4, AVI, MOV up to 50MB)
+- S3-compatible storage (MinIO)
+- Asynchronous media processing via SQS queues
+- Automatic thumbnail generation
+- PostgreSQL database with Prisma ORM
+- Swagger API documentation
+- Docker containerization
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Project Architecture
 
-## Project setup
+- **NestJS** framework with **TypeScript** as the core technology stack
+- **Backend API** and **Worker** as two main service components
+- **PostgreSQL** database with **Prisma ORM** for data persistence
+- **MinIO** S3-compatible object storage for file management
+- **SQS (Simple Queue Service)** for asynchronous task processing
+- **ImagorVideo** service for thumbnail generation
+- **Docker** and **Docker Compose** for containerized deployment
 
+## Quick Start
+
+### Prerequisites
+- Docker and Docker Compose
+- Node.js 20+ (for local development)
+
+### Run with Docker
 ```bash
-$ npm install
+# Clone and navigate to project
+git clone <repository-url>
+cd media-service-0
+
+# Start all services
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f backend
 ```
 
-## Compile and run the project
-
+### Local Development
 ```bash
-# development
-$ npm run start
+# Install dependencies
+npm install
 
-# watch mode
-$ npm run start:dev
+# Setup database
+npm run prisma:migrate
 
-# production mode
-$ npm run start:prod
+# Start development server
+npm run start:dev
+
+# Start worker (in separate terminal)
+npm run build:worker
+node dist/worker/main.js
 ```
 
-## Run tests
+## API Documentation
 
-```bash
-# unit tests
-$ npm run test
+### Swagger UI
+Access interactive API documentation at:
+- **Docker**: http://localhost:3000/api
+- **Local**: http://localhost:3000/api
 
-# e2e tests
-$ npm run test:e2e
+### Available Endpoints
 
-# test coverage
-$ npm run test:cov
+#### Upload Media File
+```
+POST /media/upload
+Content-Type: multipart/form-data
+
+Required fields:
+- file: (binary) - Media file
+- uploaderId: (number) - User ID
+- name: (string) - File name
+- mimeType: (string) - MIME type (e.g., "image/jpeg")
+- size: (number) - File size in bytes
+
+Optional fields:
+- description: (string) - File description
+- width: (number) - Image width in pixels
+- height: (number) - Image height in pixels
+- duration: (number) - Video duration in seconds
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+#### Get Media by ID
+```
+GET /media/:id
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+#### Get Media List
+```
+GET /media?page=1&size=10&sort=createdAt&order=desc&search=test
+```
 
-## Resources
+## Testing with Postman
 
-Check out a few resources that may come in handy when working with NestJS:
+### Health Check
+```
+GET http://localhost:3000/
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Upload Media File
+```
+POST http://localhost:3000/media/upload
+Content-Type: multipart/form-data
 
-## Support
+Required fields:
+- file: (File) - Media file (Images: JPEG/PNG/GIF max 10MB, Videos: MP4/AVI/MOV max 50MB)
+- uploaderId: (Number) - User ID
+- name: (String) - File name
+- mimeType: (String) - MIME type (e.g., "image/jpeg")
+- size: (Number) - File size in bytes
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Optional fields:
+- description: (String) - File description
+- width: (Number) - Image width in pixels
+- height: (Number) - Image height in pixels
+- duration: (Number) - Video duration in seconds
+```
 
-## Stay in touch
+### Get Media List
+```
+GET http://localhost:3000/media
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Query parameters (all optional):
+- page: (Number) - Page number (default: 1)
+- size: (Number) - Page size (default: 10)
+- sort: (String) - Sort field: "createdAt", "name", "size" (default: "createdAt")
+- order: (String) - Sort order "asc"/"desc" (default: "desc")
+- mimeType: (String) - Filter by MIME type
+- uploadedAfter: (Date) - Filter by date (after)
+- uploadedBefore: (Date) - Filter by date (before)
+- search: (String) - Search in file name or description
+```
 
-## License
+### Get Media by ID
+```
+GET http://localhost:3000/media/{id}
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Complete Test Scenario
+1. **Health Check**: `GET /`
+2. **Upload File**: `POST /media/upload` with test image
+3. **Check List**: `GET /media` - status should be "PENDING"
+4. **Wait 30-60 seconds** for worker processing
+5. **Check Again**: `GET /media/{id}` - status should be "READY" with thumbnails
+
+## Service URLs
+
+When running with Docker:
+- **API**: http://localhost:3000
+- **Swagger**: http://localhost:3000/api
+- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
+- **PostgreSQL**: localhost:5432 (postgres/password123)
+
+## File Processing Flow
+
+1. **Upload** → File uploaded via API
+2. **Storage** → Original file saved to MinIO
+3. **Queue** → Processing job sent to SQS
+4. **Worker** → Background worker processes file
+5. **Thumbnail** → Generated via ImagorVideo service
+6. **Complete** → Status updated to READY
+
+## Environment Variables
+
+Key configuration in `.env`:
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password123
+POSTGRES_DB=media_service
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=password123
+PORT=3000
+MAX_FILE_SIZE_IMAGE_MB=10
+MAX_FILE_SIZE_VIDEO_MB=50
+THUMBNAIL_SIZES=[{"width":150,"height":150},{"width":300,"height":300}]
+```
+
+## Development Commands
+
+```bash
+# Build
+npm run build
+npm run build:worker
+
+# Testing
+npm run test
+npm run test:e2e
+
+# Database
+npm run prisma:migrate
+npm run prisma:studio
+
+# Linting
+npm run lint
+npm run format
+```
+
+## Troubleshooting
+
+### Common Issues
+- **Port conflicts**: Ensure ports 3000, 5432, 9000, 9001, 4566, 8080 are available
+- **Docker issues**: Run `docker-compose down` and `docker-compose up -d`
+- **Database connection**: Check PostgreSQL container is healthy
+- **File upload fails**: Verify file size (images <10MB, videos <50MB) and type (JPEG/PNG/GIF/MP4/AVI/MOV)
+- **Worker not processing**: Check worker logs and SQS queue status
+
+### Error Codes
+- **400**: Validation error - check required fields
+- **413**: File too large - use images <10MB, videos <50MB
+- **415**: Unsupported media type - use JPEG/PNG/GIF/MP4/AVI/MOV
+- **404**: Media not found
+
+### Processing Status
+- **PENDING**: File uploaded, awaiting processing
+- **PROCESSING**: Worker is processing the file
+- **READY**: Processing complete, thumbnails generated
+- **FAILED**: Processing error occurred
+
+### Monitoring
+- **Processing time**: 10-120 seconds depending on file size
+- **Check SQS**: `docker exec media-service-0-localstack-1 awslocal sqs get-queue-attributes --queue-url http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/media-tasks --attribute-names All`
+- **MinIO files**: Check uploaded files at http://localhost:9001
+
+### Logs
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f backend
+docker-compose logs -f worker
+```
