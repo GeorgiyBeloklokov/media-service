@@ -4,7 +4,7 @@ A comprehensive media processing service built with NestJS that handles file upl
 
 ## Features
 
-- File upload with validation (images: JPEG, PNG, GIF up to 10MB; videos: MP4, AVI, MOV up to 50MB)
+- File upload with validation and processing
 - S3-compatible storage (MinIO)
 - Asynchronous media processing via SQS queues
 - Automatic thumbnail generation
@@ -59,98 +59,186 @@ node dist/worker/main.js
 
 ## API Documentation
 
-### Swagger UI
-Access interactive API documentation at:
-- **Docker**: http://localhost:3000/api
-- **Local**: http://localhost:3000/api
+Access interactive Swagger documentation at **http://localhost:3000/api**
 
 ### Available Endpoints
-
-#### Upload Media File
-```
-POST /media/upload
-Content-Type: multipart/form-data
-
-Required fields:
-- file: (binary) - Media file
-- uploaderId: (number) - User ID
-- name: (string) - File name
-- mimeType: (string) - MIME type (e.g., "image/jpeg")
-- size: (number) - File size in bytes
-
-Optional fields:
-- description: (string) - File description
-- width: (number) - Image width in pixels
-- height: (number) - Image height in pixels
-- duration: (number) - Video duration in seconds
-```
-
-#### Get Media by ID
-```
-GET /media/:id
-```
-
-#### Get Media List
-```
-GET /media?page=1&size=10&sort=createdAt&order=desc&search=test
-```
+- `POST /media/upload` - Upload media file
+- `GET /media/:id` - Get media by ID
+- `GET /media` - Get media list with filtering and pagination
 
 ## Testing with Postman
 
-### Health Check
-```
-GET http://localhost:3000/
+### Prerequisites
+Ensure all services are running:
+```bash
+# Start all services
+docker-compose up -d
+
+# If you made code changes, rebuild
+docker-compose up -d --build
+
+# Apply Prisma migrations (if needed)
+docker exec media-service-0-backend-1 npx prisma migrate dev --name init --skip-generate --skip-seed
 ```
 
-### Upload Media File
-```
-POST http://localhost:3000/media/upload
-Content-Type: multipart/form-data
+### A. Upload Media File (POST /media/upload)
 
-Required fields:
-- file: (File) - Media file (Images: JPEG/PNG/GIF max 10MB, Videos: MP4/AVI/MOV max 50MB)
-- uploaderId: (Number) - User ID
-- name: (String) - File name
-- mimeType: (String) - MIME type (e.g., "image/jpeg")
-- size: (Number) - File size in bytes
+**URL:** `http://localhost:3000/media/upload`  
+**Method:** `POST`  
+**Content-Type:** `multipart/form-data` (set automatically by Postman)
 
-Optional fields:
-- description: (String) - File description
-- width: (Number) - Image width in pixels
-- height: (Number) - Image height in pixels
-- duration: (Number) - Video duration in seconds
+**Request Body:** Select `form-data`. Add the following fields:
+*   `file` (type: `File`): Select an image (e.g., `.jpg`, `.png`, `.gif`) from your computer.
+*   `uploaderId` (type: `Text`): `1` (or any integer)
+*   `name` (type: `Text`): `My Test Image` (or any name)
+*   `description` (type: `Text`): `Test upload via Postman` (optional)
+*   `mimeType` (type: `Text`): `image/jpeg` (or `image/png`, `image/gif` depending on your file)
+*   `size` (type: `Text`): Specify file size in bytes. (You can find this in file properties. Important for server validation).
+*   `width` (type: `Text`): `1920` (optional, service will try to determine automatically)
+*   `height` (type: `Text`): `1080` (optional, service will try to determine automatically)
+*   `duration` (type: `Text`): `0` (for images)
+
+**File Constraints:**
+- Max file size: Images 10MB, Videos 50MB
+- Supported formats: JPEG, PNG, GIF, MP4, AVI, MOV
+- Image dimensions: up to 4096x4096
+
+**Expected Result:** 201 Created
+```json
+{
+  "id": 1,
+  "uploaderId": 1,
+  "name": "My Test Image",
+  "description": "Test upload via Postman",
+  "mimeType": "image/jpeg",
+  "size": 1024000,
+  "width": 1920,
+  "height": 1080,
+  "duration": null,
+  "originalUrl": "https://localhost:9000/media/originals/2025/1/<uuid>.jpeg?X-Amz-Algorithm=...",
+  "thumbnails": [],
+  "status": "PENDING",
+  "createdAt": "2025-01-01T12:00:00.000Z",
+  "updatedAt": "2025-01-01T12:00:00.000Z",
+  "processedAt": null
+}
 ```
 
-### Get Media List
-```
-GET http://localhost:3000/media
+**Note:** Status will be `PENDING` initially. Thumbnails are generated asynchronously by the worker.
 
-Query parameters (all optional):
-- page: (Number) - Page number (default: 1)
-- size: (Number) - Page size (default: 10)
-- sort: (String) - Sort field: "createdAt", "name", "size" (default: "createdAt")
-- order: (String) - Sort order "asc"/"desc" (default: "desc")
-- mimeType: (String) - Filter by MIME type
-- uploadedAfter: (Date) - Filter by date (after)
-- uploadedBefore: (Date) - Filter by date (before)
-- search: (String) - Search in file name or description
+### B. Get Media by ID (GET /media/:id)
+
+**URL:** `http://localhost:3000/media/{id}`  
+**Method:** `GET`  
+**Example:** `http://localhost:3000/media/1`
+
+**Expected Result:** 200 OK (after worker processing)
+```json
+{
+  "id": 1,
+  "uploaderId": 1,
+  "name": "My Test Image",
+  "description": "Test upload via Postman",
+  "mimeType": "image/jpeg",
+  "size": 1024000,
+  "width": 1920,
+  "height": 1080,
+  "duration": null,
+  "originalUrl": "https://localhost:9000/media/originals/2025/1/<uuid>.jpeg?X-Amz-Algorithm=...",
+  "thumbnails": [
+    {
+      "width": 150,
+      "height": 150,
+      "url": "https://localhost:9000/media/thumbnails/2025/1/1-150x150.jpeg?X-Amz-Algorithm=...",
+      "mimeType": "image/jpeg"
+    },
+    {
+      "width": 300,
+      "height": 300,
+      "url": "https://localhost:9000/media/thumbnails/2025/1/1-300x300.jpeg?X-Amz-Algorithm=...",
+      "mimeType": "image/jpeg"
+    }
+  ],
+  "status": "READY",
+  "createdAt": "2025-01-01T12:00:00.000Z",
+  "updatedAt": "2025-01-01T12:00:00.000Z",
+  "processedAt": "2025-01-01T12:01:30.000Z"
+}
 ```
 
-### Get Media by ID
+**Error 404:** Media not found
+```json
+{
+  "statusCode": 404,
+  "message": "Media with ID 999 not found",
+  "error": "Not Found"
+}
 ```
-GET http://localhost:3000/media/{id}
+
+### C. Get Media List (GET /media)
+
+**URL:** `http://localhost:3000/media`  
+**Method:** `GET`
+
+**Query Parameters:** You can add the following parameters for filtering and pagination:
+*   `page`: `1` (page number, default 1)
+*   `size`: `10` (items per page, default 10)
+*   `sort`: `createdAt` (sort field, default `createdAt`)
+*   `order`: `desc` (sort order, default `desc`)
+*   `mimeType`: `image/jpeg` (filter by MIME type)
+*   `uploadedAfter`: `2025-01-01` (filter by date after)
+*   `uploadedBefore`: `2025-12-31` (filter by date before)
+*   `search`: `test` (search in name or description)
+
+**Example URLs:**
+- `http://localhost:3000/media?page=1&size=5`
+- `http://localhost:3000/media?mimeType=image/jpeg&sort=createdAt&order=desc`
+- `http://localhost:3000/media?uploadedAfter=2025-01-01&search=test`
+
+**Expected Result:** 200 OK
+```json
+[
+  {
+    "id": 1,
+    "uploaderId": 1,
+    "name": "My Test Image",
+    "description": "Test upload via Postman",
+    "mimeType": "image/jpeg",
+    "size": 1024000,
+    "width": 1920,
+    "height": 1080,
+    "duration": null,
+    "originalUrl": "https://localhost:9000/media/originals/2025/1/<uuid>.jpeg?X-Amz-Algorithm=...",
+    "thumbnails": [
+      {
+        "width": 150,
+        "height": 150,
+        "url": "https://localhost:9000/media/thumbnails/2025/1/1-150x150.jpeg?X-Amz-Algorithm=...",
+        "mimeType": "image/jpeg"
+      }
+    ],
+    "status": "READY",
+    "createdAt": "2025-01-01T12:00:00.000Z",
+    "updatedAt": "2025-01-01T12:00:00.000Z",
+    "processedAt": "2025-01-01T12:01:30.000Z"
+  }
+]
 ```
 
 ### Complete Test Scenario
-1. **Health Check**: `GET /`
-2. **Upload File**: `POST /media/upload` with test image
-3. **Check List**: `GET /media` - status should be "PENDING"
+1. **Health Check**: `GET /` → 200 OK
+2. **Upload File**: `POST /media/upload` with test image → 201 Created
+3. **Check List**: `GET /media` → status should be "PENDING"
 4. **Wait 30-60 seconds** for worker processing
-5. **Check Again**: `GET /media/{id}` - status should be "READY" with thumbnails
+5. **Check Again**: `GET /media/{id}` → status should be "READY" with thumbnails
+
+### Additional Notes
+- **Asynchronous Processing**: Thumbnail generation happens asynchronously via the worker. Status changes from `PENDING` → `PROCESSING` → `READY`/`FAILED`
+- **Monitoring**: Use `docker-compose logs -f` to watch backend and worker logs during file processing
+- **File Size**: Ensure your test files meet the size constraints (10MB for images, 50MB for videos)
 
 ## Service URLs
 
-When running with Docker:
 - **API**: http://localhost:3000
 - **Swagger**: http://localhost:3000/api
 - **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
@@ -206,13 +294,12 @@ npm run format
 - **Port conflicts**: Ensure ports 3000, 5432, 9000, 9001, 4566, 8080 are available
 - **Docker issues**: Run `docker-compose down` and `docker-compose up -d`
 - **Database connection**: Check PostgreSQL container is healthy
-- **File upload fails**: Verify file size (images <10MB, videos <50MB) and type (JPEG/PNG/GIF/MP4/AVI/MOV)
 - **Worker not processing**: Check worker logs and SQS queue status
 
 ### Error Codes
 - **400**: Validation error - check required fields
-- **413**: File too large - use images <10MB, videos <50MB
-- **415**: Unsupported media type - use JPEG/PNG/GIF/MP4/AVI/MOV
+- **413**: File too large
+- **415**: Unsupported media type
 - **404**: Media not found
 
 ### Processing Status
@@ -221,10 +308,27 @@ npm run format
 - **READY**: Processing complete, thumbnails generated
 - **FAILED**: Processing error occurred
 
-### Monitoring
-- **Processing time**: 10-120 seconds depending on file size
-- **Check SQS**: `docker exec media-service-0-localstack-1 awslocal sqs get-queue-attributes --queue-url http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/media-tasks --attribute-names All`
-- **MinIO files**: Check uploaded files at http://localhost:9001
+## Monitoring & Debugging
+
+### Performance
+- Small images (< 1MB): 10-30 seconds
+- Medium images (1-5MB): 30-60 seconds
+- Large images (5-10MB): 60-120 seconds
+- Videos: 60-180 seconds depending on size and duration
+
+### MinIO Storage
+- **Console**: http://localhost:9001 (minioadmin/minioadmin)
+- **Original files**: `media/originals/YYYY/MM/`
+- **Thumbnails**: `media/thumbnails/YYYY/MM/`
+
+### SQS Queue
+```bash
+# Check queue status
+docker exec media-service-0-localstack-1 awslocal sqs get-queue-attributes --queue-url http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/media-tasks --attribute-names All
+
+# Monitor messages
+docker exec media-service-0-localstack-1 awslocal sqs receive-message --queue-url http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/media-tasks
+```
 
 ### Logs
 ```bash
@@ -232,6 +336,6 @@ npm run format
 docker-compose logs -f
 
 # Specific service
-docker-compose logs -f backend
-docker-compose logs -f worker
+docker-compose logs backend
+docker-compose logs worker
 ```
