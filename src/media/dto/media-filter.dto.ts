@@ -1,23 +1,21 @@
-import {
-  IsOptional,
-  IsInt,
-  Min,
-  Max,
-  IsDateString,
-  IsEnum,
-  IsString,
-} from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsDateString, IsEnum, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export enum MediaSortBy {
-  CREATED_AT_DESC = 'createdAt_desc',
-  CREATED_AT_ASC = 'createdAt_asc',
+  CREATED_AT = 'createdAt',
+  NAME = 'name',
+  SIZE = 'size',
+}
+
+export enum SortOrder {
+  ASC = 'asc',
+  DESC = 'desc',
 }
 
 export class MediaFilterDto {
   @ApiPropertyOptional({
-    description: 'Номер страницы для пагинации',
+    description: 'Page number for pagination',
     default: 1,
   })
   @IsOptional()
@@ -27,7 +25,7 @@ export class MediaFilterDto {
   page?: number = 1;
 
   @ApiPropertyOptional({
-    description: 'Количество элементов на странице',
+    description: 'Number of items per page',
     default: 10,
   })
   @IsOptional()
@@ -39,35 +37,43 @@ export class MediaFilterDto {
 
   @ApiPropertyOptional({
     enum: MediaSortBy,
-    description: 'Поле и порядок сортировки',
-    default: MediaSortBy.CREATED_AT_DESC,
+    description: 'Sort field',
+    default: MediaSortBy.CREATED_AT,
   })
   @IsOptional()
   @IsEnum(MediaSortBy)
-  sort?: MediaSortBy = MediaSortBy.CREATED_AT_DESC;
+  sort?: MediaSortBy = MediaSortBy.CREATED_AT;
 
-  @ApiPropertyOptional({ description: 'MIME-тип файла для фильтрации' })
+  @ApiPropertyOptional({
+    enum: SortOrder,
+    description: 'Sort order (asc/desc)',
+    default: SortOrder.DESC,
+  })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  order?: SortOrder = SortOrder.DESC;
+
+  @ApiPropertyOptional({ description: 'File MIME type for filtering' })
   @IsOptional()
   @IsString()
   mimeType?: string;
 
   @ApiPropertyOptional({
-    description:
-      'Фильтровать медиафайлы, загруженные после этой даты (ISO 8601)',
+    description: 'Filter media files uploaded after this date (ISO 8601)',
   })
   @IsOptional()
   @IsDateString()
   uploadedAfter?: string;
 
   @ApiPropertyOptional({
-    description: 'Фильтровать медиафайлы, загруженные до этой даты (ISO 8601)',
+    description: 'Filter media files uploaded before this date (ISO 8601)',
   })
   @IsOptional()
   @IsDateString()
   uploadedBefore?: string;
 
   @ApiPropertyOptional({
-    description: 'Поисковый запрос по имени или описанию файла',
+    description: 'Search query for file name or description',
   })
   @IsOptional()
   @IsString()

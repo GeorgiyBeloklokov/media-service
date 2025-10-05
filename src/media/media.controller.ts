@@ -1,9 +1,7 @@
 import {
   Body,
   Controller,
-  FileTypeValidator,
   Get,
-  MaxFileSizeValidator,
   Param,
   ParseFilePipe,
   ParseIntPipe,
@@ -14,14 +12,8 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  ApiBody,
-  ApiConsumes,
-  ApiCreatedResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { FILE_VALIDATORS, UPLOAD_SCHEMA } from './constants/controller.constants';
 import { CreateMediaDto } from './dto/create-media.dto';
 import { MediaFilterDto } from './dto/media-filter.dto';
 import { MediaResponseDto } from './dto/media-response.dto';
@@ -34,61 +26,34 @@ export class MediaController {
   @Post('/upload')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-        uploaderId: { type: 'number' },
-        name: { type: 'string' },
-        description: { type: 'string' },
-        mimeType: { type: 'string' },
-        size: { type: 'number' },
-        width: { type: 'number' },
-        height: { type: 'number' },
-        duration: { type: 'number' },
-      },
-    },
-  })
-  @ApiOperation({ summary: 'Загрузка нового медиафайла' })
+  @ApiBody({ schema: UPLOAD_SCHEMA })
+  @ApiOperation({ summary: 'Upload new media file' })
   @ApiCreatedResponse({
-    description: 'Медиафайл успешно загружен',
+    description: 'Media file successfully uploaded',
     type: MediaResponseDto,
   })
   async uploadMedia(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 10 }), // 10MB
-          new FileTypeValidator({ fileType: 'image/(jpeg|png|gif)' }),
-        ],
-      }),
-    )
+    @UploadedFile(new ParseFilePipe({ validators: FILE_VALIDATORS }))
     file: Express.Multer.File,
     @Body() createMediaDto: CreateMediaDto,
   ): Promise<MediaResponseDto> {
     return this.mediaService.uploadMedia(file, createMediaDto);
   }
 
-  @ApiOperation({ summary: 'Получение информации о медиафайле по ID' })
+  @ApiOperation({ summary: 'Get media file information by ID' })
   @ApiOkResponse({
-    description: 'Информация о медиафайле',
+    description: 'Media file information',
     type: MediaResponseDto,
   })
-  @ApiResponse({ status: 404, description: 'Медиафайл не найден' })
+  @ApiResponse({ status: 404, description: 'Media file not found' })
   @Get(':id')
-  async getMediaById(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<MediaResponseDto> {
+  async getMediaById(@Param('id', ParseIntPipe) id: number): Promise<MediaResponseDto> {
     return this.mediaService.getMediaById(id);
   }
 
-  @ApiOperation({ summary: 'Получение списка медиафайлов' })
+  @ApiOperation({ summary: 'Get list of media files' })
   @ApiOkResponse({
-    description: 'Список медиафайлов',
+    description: 'List of media files',
     type: [MediaResponseDto],
   })
   @Get()

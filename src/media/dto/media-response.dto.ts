@@ -8,70 +8,70 @@ export enum MediaStatus {
 }
 
 export class ThumbnailResponseDto {
-  @ApiProperty({ description: 'Ширина миниатюры' })
+  @ApiProperty({ description: 'Thumbnail width' })
   width: number;
 
-  @ApiProperty({ description: 'Высота миниатюры' })
+  @ApiProperty({ description: 'Thumbnail height' })
   height: number;
 
-  @ApiProperty({ description: 'URL миниатюры' })
+  @ApiProperty({ description: 'Thumbnail URL' })
   url: string;
 
-  @ApiProperty({ description: 'MIME-тип миниатюры' })
+  @ApiProperty({ description: 'Thumbnail MIME type' })
   mimeType: string;
 }
 
 export class MediaResponseDto {
-  @ApiProperty({ description: 'Уникальный идентификатор медиафайла' })
+  @ApiProperty({ description: 'Unique media file identifier' })
   id: number;
 
-  @ApiProperty({ description: 'ID пользователя, загрузившего файл' })
+  @ApiProperty({ description: 'ID of the user who uploaded the file' })
   uploaderId: number;
 
-  @ApiProperty({ description: 'Имя файла' })
+  @ApiProperty({ description: 'File name' })
   name: string;
 
-  @ApiPropertyOptional({ description: 'Описание файла' })
+  @ApiPropertyOptional({ description: 'File description' })
   description?: string | null;
 
-  @ApiProperty({ description: 'MIME-тип файла' })
+  @ApiProperty({ description: 'File MIME type' })
   mimeType: string;
 
-  @ApiProperty({ description: 'Размер файла в байтах' })
+  @ApiProperty({ description: 'File size in bytes' })
   size: number;
 
-  @ApiPropertyOptional({ description: 'Ширина изображения (для изображений)' })
+  @ApiPropertyOptional({ description: 'Image width (for images)' })
   width?: number | null;
 
-  @ApiPropertyOptional({ description: 'Высота изображения (для изображений)' })
+  @ApiPropertyOptional({ description: 'Image height (for images)' })
   height?: number | null;
 
   @ApiPropertyOptional({
-    description: 'Длительность видео в секундах (для видео)',
+    description: 'Video duration in seconds (for videos)',
   })
   duration?: number | null;
 
-  @ApiProperty({ description: 'URL оригинального файла' })
+  @ApiProperty({ description: 'Original file URL' })
   originalUrl: string;
 
   @ApiPropertyOptional({
     type: [ThumbnailResponseDto],
-    description: 'Массив миниатюр с URL и метаданными',
+    description: 'Array of thumbnails with URLs and metadata',
   })
   thumbnails?: ThumbnailResponseDto[] | null;
 
   @ApiProperty({
     enum: MediaStatus,
-    description: 'Статус обработки медиафайла',
+    description: 'Media file processing status',
   })
   status: MediaStatus;
 
-  @ApiProperty({ description: 'Дата и время создания записи' })
+  @ApiProperty({ description: 'Record creation date and time' })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Дата и время последнего обновления записи' })
+  @ApiProperty({ description: 'Record last update date and time' })
   updatedAt: Date;
 
-  @ApiPropertyOptional({ description: 'Дата и время завершения обработки' })
+  @ApiPropertyOptional({ description: 'Processing completion date and time' })
   processedAt?: Date | null;
 }

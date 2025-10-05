@@ -1,51 +1,44 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsInt,
-  Min,
-  IsMimeType,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsInt, Min, IsMimeType } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreateMediaDto {
-  @ApiProperty({ description: 'ID пользователя, загрузившего файл' })
+  @ApiProperty({ description: 'ID of the user who uploaded the file' })
   @IsInt()
   @IsNotEmpty()
   @Type(() => Number)
   uploaderId: number;
 
-  @ApiProperty({ description: 'Имя файла' })
+  @ApiProperty({ description: 'File name' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiPropertyOptional({ description: 'Описание файла' })
+  @ApiPropertyOptional({ description: 'File description' })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({ description: 'MIME-тип файла' })
+  @ApiProperty({ description: 'File MIME type' })
   @IsMimeType()
   @IsNotEmpty()
   mimeType: string;
 
-  @ApiProperty({ description: 'Размер файла в байтах' })
+  @ApiProperty({ description: 'File size in bytes' })
   @IsInt()
   @IsNotEmpty()
   @Min(0)
   @Type(() => Number)
   size: number;
 
-  @ApiPropertyOptional({ description: 'Ширина изображения (для изображений)' })
+  @ApiPropertyOptional({ description: 'Image width (for images)' })
   @IsOptional()
   @IsInt()
   @Min(1)
   @Type(() => Number)
   width?: number;
 
-  @ApiPropertyOptional({ description: 'Высота изображения (для изображений)' })
+  @ApiPropertyOptional({ description: 'Image height (for images)' })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -53,7 +46,7 @@ export class CreateMediaDto {
   height?: number;
 
   @ApiPropertyOptional({
-    description: 'Длительность видео в секундах (для видео)',
+    description: 'Video duration in seconds (for videos)',
   })
   @IsOptional()
   @IsInt()
