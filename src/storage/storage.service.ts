@@ -1,10 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
@@ -19,33 +14,20 @@ export class StorageService {
   constructor(private readonly configService: ConfigService) {
     this.region = this.configService.get<string>('MINIO_REGION', 'us-east-1');
     this.bucketName = this.configService.get<string>('MINIO_BUCKET', 'media');
-    const endpoint = this.configService.get<string>(
-      'MINIO_ENDPOINT',
-      'http://minio:9000',
-    );
+    const endpoint = this.configService.get<string>('MINIO_ENDPOINT', 'http://minio:9000');
 
     this.s3Client = new S3Client({
       region: this.region,
       endpoint: endpoint,
       credentials: {
-        accessKeyId: this.configService.get<string>(
-          'MINIO_ROOT_USER',
-          'minioadmin',
-        ),
-        secretAccessKey: this.configService.get<string>(
-          'MINIO_ROOT_PASSWORD',
-          'minioadmin',
-        ),
+        accessKeyId: this.configService.get<string>('MINIO_ROOT_USER', 'minioadmin'),
+        secretAccessKey: this.configService.get<string>('MINIO_ROOT_PASSWORD', 'minioadmin'),
       },
       forcePathStyle: true, // Required for MinIO
     });
   }
 
-  async uploadFile(
-    key: string,
-    buffer: Buffer,
-    mimeType: string,
-  ): Promise<string> {
+  async uploadFile(key: string, buffer: Buffer, mimeType: string): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -58,8 +40,7 @@ export class StorageService {
       this.logger.log(`File uploaded successfully: ${key}`);
       return `s3://${this.bucketName}/${key}`;
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      this.logger.error(`Failed to upload file ${key}: ${error.message}`);
+      this.logger.error(`Failed to upload file ${key}: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -78,8 +59,7 @@ export class StorageService {
       }
       return Buffer.from(await response.Body.transformToByteArray());
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      this.logger.error(`Failed to retrieve file ${key}: ${error.message}`);
+      this.logger.error(`Failed to retrieve file ${key}: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -94,16 +74,12 @@ export class StorageService {
       await this.s3Client.send(command);
       this.logger.log(`File deleted successfully: ${key}`);
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      this.logger.error(`Failed to delete file ${key}: ${error.message}`);
+      this.logger.error(`Failed to delete file ${key}: ${(error as Error).message}`);
       throw error;
     }
   }
 
-  async generatePresignedUrl(
-    key: string,
-    expiresIn: number = 3600,
-  ): Promise<string> {
+  async generatePresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -114,10 +90,7 @@ export class StorageService {
       this.logger.log(`Presigned URL generated for ${key}`);
       return url;
     } catch (error) {
-      this.logger.error(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Failed to generate presigned URL for ${key}: ${error.message}`,
-      );
+      this.logger.error(`Failed to generate presigned URL for ${key}: ${(error as Error).message}`);
       throw error;
     }
   }
