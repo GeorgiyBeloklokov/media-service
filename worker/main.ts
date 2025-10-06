@@ -6,10 +6,12 @@ import { PrismaClient } from '@prisma/client';
 import { loadWorkerConfig } from './config/loader';
 import { MediaProcessor } from './services/media-processor';
 import { QueuePoller } from './services/queue-poller';
+import { WorkerGracefulShutdown } from './graceful-shutdown';
 
 class Worker {
   private readonly prisma: PrismaClient;
   private readonly queuePoller: QueuePoller;
+  private readonly gracefulShutdown: WorkerGracefulShutdown;
   private readonly logger = new Logger(Worker.name);
 
   constructor() {
@@ -48,6 +50,8 @@ class Worker {
     );
 
     this.queuePoller = new QueuePoller(sqsClient, sqsQueueUrl, mediaProcessor);
+
+    this.gracefulShutdown = new WorkerGracefulShutdown(this.prisma, () => this.queuePoller.stopPolling());
   }
 
   async startPolling(): Promise<void> {
@@ -79,16 +83,4 @@ bootstrapWorker().catch((error) => {
   process.exit(1);
 });
 
-process.on('SIGTERM', () => {
-  void (async () => {
-    await worker.onApplicationShutdown();
-    process.exit(0);
-  })();
-});
-
-process.on('SIGINT', () => {
-  void (async () => {
-    await worker.onApplicationShutdown();
-    process.exit(0);
-  })();
-});
+// Signal handlers are now managed by WorkerGracefulShutdown

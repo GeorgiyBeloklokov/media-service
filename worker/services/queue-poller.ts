@@ -7,6 +7,7 @@ import { MediaProcessor } from './media-processor';
 
 export class QueuePoller {
   private readonly logger = new Logger(QueuePoller.name);
+  private isPolling = false;
 
   constructor(
     private readonly sqsClient: SQSClient,
@@ -16,9 +17,10 @@ export class QueuePoller {
 
   async startPolling(): Promise<void> {
     this.logger.log('Worker polling started...');
+    this.isPolling = true;
 
     try {
-      while (true) {
+      while (this.isPolling) {
         try {
           await this.pollOnce();
         } catch (error) {
@@ -26,13 +28,20 @@ export class QueuePoller {
           this.logger.error(`Error during polling: ${errorMessage}`);
         }
 
-        await this.sleep(WORKER_DEFAULTS.polling.intervalSeconds * 1000);
+        if (this.isPolling) {
+          await this.sleep(WORKER_DEFAULTS.polling.intervalSeconds * 1000);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Unhandled error in startPolling: ${errorMessage}. Exiting worker.`);
       process.exit(1);
     }
+  }
+
+  stopPolling(): void {
+    this.logger.log('Stopping polling...');
+    this.isPolling = false;
   }
 
   private async pollOnce(): Promise<void> {
