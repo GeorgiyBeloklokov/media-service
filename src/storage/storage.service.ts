@@ -94,4 +94,21 @@ export class StorageService {
       throw error;
     }
   }
+
+  async checkConnection(): Promise<void> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: 'health-check-dummy',
+    });
+
+    try {
+      await this.s3Client.send(command);
+    } catch (error) {
+      // Expected error for non-existent key, but connection works
+      if ((error as Error).name === 'NoSuchKey') {
+        return;
+      }
+      throw error;
+    }
+  }
 }

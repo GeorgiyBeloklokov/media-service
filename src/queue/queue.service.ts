@@ -105,4 +105,14 @@ export class QueueService {
       throw error;
     }
   }
+
+  async checkConnection(): Promise<void> {
+    const command = new ReceiveMessageCommand({
+      QueueUrl: this.queueUrl,
+      MaxNumberOfMessages: 1,
+      WaitTimeSeconds: 1,
+    });
+
+    await this.sqsClient.send(command);
+  }
 }
