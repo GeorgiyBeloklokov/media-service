@@ -65,6 +65,7 @@ Access interactive Swagger documentation at **http://localhost:3000/api**
 - `POST /media/upload` - Upload media file
 - `GET /media/:id` - Get media by ID
 - `GET /media` - Get media list with filtering and pagination
+- `GET /health` - Health check for all services
 
 ## Testing with Postman
 
@@ -225,21 +226,69 @@ docker exec media-service-0-backend-1 npx prisma migrate dev --name init --skip-
 ]
 ```
 
+### D. Health Check (GET /health)
+
+**URL:** `http://localhost:3000/health`  
+**Method:** `GET`
+
+**Expected Result:** 200 OK (all services healthy)
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "database": {
+    "status": "healthy",
+    "responseTime": 15
+  },
+  "storage": {
+    "status": "healthy",
+    "responseTime": 25
+  },
+  "queue": {
+    "status": "healthy",
+    "responseTime": 10
+  }
+}
+```
+
+**Error 503:** Service unavailable (when components are down)
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "database": {
+    "status": "unhealthy",
+    "message": "Database connection failed",
+    "responseTime": 5000
+  }
+}
+```
+
 ### Complete Test Scenario
-1. **Health Check**: `GET /` → 200 OK
+1. **Health Check**: `GET /health` → 200 OK
 2. **Upload File**: `POST /media/upload` with test image → 201 Created
 3. **Check List**: `GET /media` → status should be "PENDING"
 4. **Wait 30-60 seconds** for worker processing
 5. **Check Again**: `GET /media/{id}` → status should be "READY" with thumbnails
 
+### Automated Testing
+```bash
+# Run automated health check and graceful shutdown test
+chmod +x scripts/test-graceful-shutdown.sh
+./scripts/test-graceful-shutdown.sh
+```
+
 ### Additional Notes
 - **Asynchronous Processing**: Thumbnail generation happens asynchronously via the worker. Status changes from `PENDING` → `PROCESSING` → `READY`/`FAILED`
+- **Graceful Shutdown**: Services handle SIGTERM/SIGINT signals for clean shutdown
+- **Health Monitoring**: Use `/health` endpoint for service monitoring and Kubernetes probes
 - **Monitoring**: Use `docker-compose logs -f` to watch backend and worker logs during file processing
 - **File Size**: Ensure your test files meet the size constraints (10MB for images, 50MB for videos)
 
 ## Service URLs
 
 - **API**: http://localhost:3000
+- **Health Check**: http://localhost:3000/health
 - **Swagger**: http://localhost:3000/api
 - **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
 - **PostgreSQL**: localhost:5432 (postgres/password123)
