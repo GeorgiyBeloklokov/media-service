@@ -37,7 +37,7 @@ class Worker {
       },
     });
 
-    const sqsQueueUrl = `http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/${config.sqs.queueName}`;
+    const sqsQueueUrl = `${config.sqs.endpoint}/000000000000/${config.sqs.queueName}`;
 
     const mediaProcessor = new MediaProcessor(
       this.prisma,

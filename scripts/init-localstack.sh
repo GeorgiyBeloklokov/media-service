@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Wait for LocalStack to be ready
 echo "Waiting for LocalStack to be ready..."
@@ -18,8 +19,6 @@ aws --endpoint-url=http://localstack:4566 sqs create-queue \
 aws --endpoint-url=http://localstack:4566 sqs create-queue \
   --queue-name media-tasks \
   --region us-east-1 \
-  --attributes '{
-    "RedrivePolicy": "{\\"deadLetterTargetArn\\":\\"arn:aws:sqs:us-east-1:000000000000:media-tasks-dlq\\",\\"maxReceiveCount\\":\\"3\\"}"
-  }'
+  --attributes '{ "RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:media-tasks-dlq\",\"maxReceiveCount\":\"3\"}" }'
 
 echo "SQS queues created and configured successfully!"

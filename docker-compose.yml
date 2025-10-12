@@ -141,6 +141,7 @@ services:
       minio-init:
         condition: service_completed_successfully
     restart: on-failure
+    command: ["npm", "run", "start:prod"]
 
   worker:
     build:
@@ -174,7 +175,7 @@ services:
       minio-init:
         condition: service_completed_successfully
     restart: on-failure
-    command: ['node', 'dist/worker/index.js']
+    command: ['node', 'dist/worker/main.js']
 
 volumes:
   db-data:

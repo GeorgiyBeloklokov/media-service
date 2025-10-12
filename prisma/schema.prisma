@@ -23,7 +23,7 @@ model Media {
   size        Int
   width       Int?
   height      Int?
-  duration    Int?      @map("durationSeconds")
+  duration    Int?
   originalUrl String
   thumbnails  Json?
   status      MediaStatus @default(PENDING)

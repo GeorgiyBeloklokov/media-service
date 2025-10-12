@@ -3,6 +3,8 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
+import { Upload } from '@aws-sdk/lib-storage';
+import { Readable } from 'stream';
 
 @Injectable()
 export class StorageService {
@@ -41,6 +43,27 @@ export class StorageService {
       return `s3://${this.bucketName}/${key}`;
     } catch (error) {
       this.logger.error(`Failed to upload file ${key}: ${(error as Error).message}`);
+      throw error;
+    }
+  }
+
+  async uploadStream(key: string, stream: Readable, mimeType: string): Promise<string> {
+    const upload = new Upload({
+      client: this.s3Client,
+      params: {
+        Bucket: this.bucketName,
+        Key: key,
+        Body: stream,
+        ContentType: mimeType,
+      },
+    });
+
+    try {
+      await upload.done();
+      this.logger.log(`File uploaded successfully via stream: ${key}`);
+      return `s3://${this.bucketName}/${key}`;
+    } catch (error) {
+      this.logger.error(`Failed to upload file ${key} via stream: ${(error as Error).message}`);
       throw error;
     }
   }

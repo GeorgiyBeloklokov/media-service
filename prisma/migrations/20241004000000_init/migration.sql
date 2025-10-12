@@ -4,14 +4,14 @@ CREATE TYPE "MediaStatus" AS ENUM ('PENDING', 'PROCESSING', 'READY', 'FAILED');
 -- CreateTable
 CREATE TABLE "Media" (
     "id" SERIAL NOT NULL,
-    "uploaderId" TEXT NOT NULL,
+    "uploaderId" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "mimeType" TEXT NOT NULL,
     "size" INTEGER NOT NULL,
     "width" INTEGER,
     "height" INTEGER,
-    "duration" DOUBLE PRECISION,
+    "duration" INTEGER,
     "originalUrl" TEXT NOT NULL,
     "thumbnails" JSONB,
     "status" "MediaStatus" NOT NULL DEFAULT 'PENDING',

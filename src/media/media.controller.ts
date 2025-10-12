@@ -1,20 +1,7 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseFilePipe,
-  ParseIntPipe,
-  Post,
-  Query,
-  UploadedFile,
-  UseInterceptors,
-  ValidationPipe,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Get, Param, ParseIntPipe, Post, Query, Req, ValidationPipe } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { FILE_VALIDATORS, UPLOAD_SCHEMA } from './constants/controller.constants';
-import { CreateMediaDto } from './dto/create-media.dto';
+import type { Request } from 'express';
+import { UPLOAD_SCHEMA } from './constants/controller.constants';
 import { MediaFilterDto } from './dto/media-filter.dto';
 import { MediaResponseDto } from './dto/media-response.dto';
 import { MediaService } from './media.service';
@@ -24,7 +11,6 @@ export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
 
   @Post('/upload')
-  @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: UPLOAD_SCHEMA })
   @ApiOperation({ summary: 'Upload new media file' })
@@ -32,12 +18,8 @@ export class MediaController {
     description: 'Media file successfully uploaded',
     type: MediaResponseDto,
   })
-  async uploadMedia(
-    @UploadedFile(new ParseFilePipe({ validators: FILE_VALIDATORS }))
-    file: Express.Multer.File,
-    @Body() createMediaDto: CreateMediaDto,
-  ): Promise<MediaResponseDto> {
-    return this.mediaService.uploadMedia(file, createMediaDto);
+  async uploadMedia(@Req() req: Request): Promise<MediaResponseDto> {
+    return this.mediaService.uploadMedia(req);
   }
 
   @ApiOperation({ summary: 'Get media file information by ID' })
