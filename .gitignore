@@ -7,6 +7,9 @@
 /proj-docs
 .vscode
 .amazonq
+.gemini
+GEMINI.md
+to-do-by-gemini.md
 
 # Logs
 logs
