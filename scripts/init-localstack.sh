@@ -9,14 +9,17 @@ done
 
 echo "LocalStack is ready. Creating SQS queues..."
 
-# Create the main queue
-aws --endpoint-url=http://localstack:4566 sqs create-queue \
-  --queue-name media-tasks \
-  --region us-east-1
-
-# Create the DLQ queue
+# Create the DLQ queue first
 aws --endpoint-url=http://localstack:4566 sqs create-queue \
   --queue-name media-tasks-dlq \
   --region us-east-1
 
-echo "SQS queues created successfully!"
+# Create the main queue with a redrive policy pointing to the DLQ
+aws --endpoint-url=http://localstack:4566 sqs create-queue \
+  --queue-name media-tasks \
+  --region us-east-1 \
+  --attributes '{
+    "RedrivePolicy": "{\\"deadLetterTargetArn\\":\\"arn:aws:sqs:us-east-1:000000000000:media-tasks-dlq\\",\\"maxReceiveCount\\":\\"3\\"}"
+  }'
+
+echo "SQS queues created and configured successfully!"
