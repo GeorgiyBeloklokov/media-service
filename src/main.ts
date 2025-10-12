@@ -2,12 +2,21 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Set security-related HTTP headers
   app.use(helmet());
+
+  // Apply global validation and sanitization pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Strip properties that do not have any decorators
+      transform: true, // Automatically transform payloads to DTO instances
+    }),
+  );
 
   // Enable graceful shutdown
   app.enableShutdownHooks();

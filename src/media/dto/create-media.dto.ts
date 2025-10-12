@@ -1,6 +1,7 @@
 import { IsString, IsNotEmpty, IsOptional, IsInt, Min, IsMimeType } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { Trim, Escape } from 'class-sanitizer';
 
 export class CreateMediaDto {
   @ApiProperty({ description: 'ID of the user who uploaded the file' })
@@ -12,11 +13,15 @@ export class CreateMediaDto {
   @ApiProperty({ description: 'File name' })
   @IsString()
   @IsNotEmpty()
+  @Trim()
+  @Escape()
   name: string;
 
   @ApiPropertyOptional({ description: 'File description' })
   @IsOptional()
   @IsString()
+  @Trim()
+  @Escape()
   description?: string;
 
   @ApiProperty({ description: 'File MIME type' })

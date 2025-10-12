@@ -1,6 +1,7 @@
 import { IsOptional, IsInt, Min, Max, IsDateString, IsEnum, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { Trim, Escape } from 'class-sanitizer';
 
 export enum MediaSortBy {
   CREATED_AT = 'createdAt',
@@ -56,6 +57,7 @@ export class MediaFilterDto {
   @ApiPropertyOptional({ description: 'File MIME type for filtering' })
   @IsOptional()
   @IsString()
+  @Trim()
   mimeType?: string;
 
   @ApiPropertyOptional({
@@ -77,5 +79,7 @@ export class MediaFilterDto {
   })
   @IsOptional()
   @IsString()
+  @Trim()
+  @Escape()
   search?: string;
 }
