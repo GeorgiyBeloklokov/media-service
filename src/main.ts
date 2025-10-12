@@ -1,9 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Set security-related HTTP headers
+  app.use(helmet());
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
@@ -19,14 +23,14 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 
   // Handle shutdown signals
-  process.on('SIGTERM', async () => {
+  process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
-    await app.close();
+    void app.close();
   });
 
-  process.on('SIGINT', async () => {
+  process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully');
-    await app.close();
+    void app.close();
   });
 }
 
