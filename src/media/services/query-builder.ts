@@ -1,6 +1,8 @@
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { MediaFilterDto, MediaSortBy, SortOrder } from '../dto/media-filter.dto';
 
+@Injectable()
 export class QueryBuilder {
   buildWhereClause(filterDto: MediaFilterDto): Prisma.MediaWhereInput {
     const { mimeType, uploadedAfter, uploadedBefore, search } = filterDto;

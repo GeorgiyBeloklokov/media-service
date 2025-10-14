@@ -8,6 +8,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
@@ -18,6 +19,12 @@ import { APP_GUARD } from '@nestjs/core';
         limit: 100, // 100 requests
       },
     ]),
+    CacheModule.register({
+      isGlobal: true,
+      store: 'redis',
+      host: 'redis',
+      port: 6379,
+    }),
     PrismaModule,
     MediaModule,
     HealthModule,

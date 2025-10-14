@@ -16,6 +16,18 @@ services:
       timeout: 5s
       retries: 5
 
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: minio/minio
     restart: always
@@ -130,6 +142,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       minio:
         condition: service_started
       localstack:
@@ -163,6 +177,8 @@ services:
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       minio:
         condition: service_started

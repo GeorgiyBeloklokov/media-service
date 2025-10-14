@@ -1,12 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { CreateMediaDto } from '../media/dto/create-media.dto';
 import { MediaFilterDto } from '../media/dto/media-filter.dto';
 import { MediaResponseDto } from '../media/dto/media-response.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueueService } from '../queue/queue.service';
 import { StorageService } from '../storage/storage.service';
-import { MediaConfig } from './config/media-config';
 import { FileValidator } from './services/file-validator';
 import { MediaProcessor } from './services/media-processor';
 import { QueryBuilder } from './services/query-builder';
@@ -18,24 +16,15 @@ import { Request } from 'express';
 
 @Injectable()
 export class MediaService {
-  private readonly fileValidator: FileValidator;
-  private readonly mediaProcessor: MediaProcessor;
-  private readonly queryBuilder: QueryBuilder;
-  private readonly responseMapper: ResponseMapper;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly queueService: QueueService,
-    private readonly configService: ConfigService,
-  ) {
-    const config = new MediaConfig(this.configService);
-
-    this.fileValidator = new FileValidator(config);
-    this.mediaProcessor = new MediaProcessor(config);
-    this.queryBuilder = new QueryBuilder();
-    this.responseMapper = new ResponseMapper(this.storageService);
-  }
+    private readonly fileValidator: FileValidator,
+    private readonly mediaProcessor: MediaProcessor,
+    private readonly queryBuilder: QueryBuilder,
+    private readonly responseMapper: ResponseMapper,
+  ) {}
 
   async uploadMedia(req: Request): Promise<MediaResponseDto> {
     return new Promise((resolve, reject) => {
@@ -50,6 +39,8 @@ export class MediaService {
         if (name === 'file') {
           const objectKey = this.mediaProcessor.generateObjectKey(info.filename);
 
+          file.on('error', reject);
+
           this.storageService
             .uploadStream(objectKey, file, info.mimeType)
             .then(async () => {
@@ -59,7 +50,12 @@ export class MediaService {
                 throw new BadRequestException(errors);
               }
 
-              this.fileValidator.validate({ ...createMediaDto, mimeType: info.mimeType, name: info.filename, size: 0 }); // Size validation is tricky with streams, skipping for now
+              this.fileValidator.validate({
+                ...createMediaDto,
+                mimeType: info.mimeType,
+                name: info.filename,
+                size: 0,
+              }); // Size validation is tricky with streams, skipping for now
 
               const media = await this.prisma.$transaction(async (prisma) => {
                 const createdMedia = await prisma.media.create({
@@ -79,6 +75,8 @@ export class MediaService {
           file.resume();
         }
       });
+
+      bb.on('error', reject);
 
       req.pipe(bb);
     });

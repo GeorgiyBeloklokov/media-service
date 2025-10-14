@@ -1,7 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { MediaConfig } from '../config/media-config';
 import { CreateMediaDto } from '../dto/create-media.dto';
 
+@Injectable()
 export class FileValidator {
   constructor(private readonly config: MediaConfig) {}
 

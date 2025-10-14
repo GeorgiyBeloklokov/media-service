@@ -1,3 +1,5 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Media } from '@prisma/client';
 import { MediaResponseDto, MediaStatus } from '../dto/media-response.dto';
 import { StorageService } from '../../storage/storage.service';
@@ -9,12 +11,16 @@ interface ThumbnailData {
   mimeType: string;
 }
 
+@Injectable()
 export class ResponseMapper {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(
+    private readonly storageService: StorageService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   async mapMediaToResponseDto(media: Media): Promise<MediaResponseDto> {
     const [originalUrl, thumbnails] = await Promise.all([
-      this.storageService.generatePresignedUrl(media.originalUrl),
+      this.getCachedPresignedUrl(media.originalUrl),
       this.mapThumbnails(media.thumbnails),
     ]);
 
@@ -45,8 +51,20 @@ export class ResponseMapper {
     return Promise.all(
       (thumbnails as ThumbnailData[]).map(async (thumb) => ({
         ...thumb,
-        url: await this.storageService.generatePresignedUrl(thumb.url),
+        url: await this.getCachedPresignedUrl(thumb.url),
       })),
     );
+  }
+
+  private async getCachedPresignedUrl(key: string): Promise<string> {
+    const cachedUrl = await this.cacheManager.get<string>(key);
+    if (cachedUrl) {
+      return cachedUrl;
+    }
+
+    const newUrl = await this.storageService.generatePresignedUrl(key);
+    // Cache for 59 minutes
+    await this.cacheManager.set(key, newUrl, 3540);
+    return newUrl;
   }
 }

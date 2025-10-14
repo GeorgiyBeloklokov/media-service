@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,6 +15,7 @@ interface QueueMessage {
   retryCount: number;
 }
 
+@Injectable()
 export class MediaProcessor {
   private readonly logger = new Logger(MediaProcessor.name);
 

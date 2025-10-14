@@ -1,10 +1,21 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Query, Req, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  UseInterceptors,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { UPLOAD_SCHEMA } from './constants/controller.constants';
 import { MediaFilterDto } from './dto/media-filter.dto';
 import { MediaResponseDto } from './dto/media-response.dto';
 import { MediaService } from './media.service';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 
 @Controller('media')
 export class MediaController {
@@ -28,6 +39,7 @@ export class MediaController {
     type: MediaResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Media file not found' })
+  @UseInterceptors(CacheInterceptor)
   @Get(':id')
   async getMediaById(@Param('id', ParseIntPipe) id: number): Promise<MediaResponseDto> {
     return this.mediaService.getMediaById(id);
