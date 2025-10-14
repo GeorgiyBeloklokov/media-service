@@ -34,4 +34,7 @@ model Media {
   @@index([createdAt])
   @@index([status, createdAt])
   @@index([uploaderId])
+  @@index([mimeType])
+  @@index([size])
+  @@index([name])
 }
