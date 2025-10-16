@@ -3,7 +3,6 @@ import { CreateMediaDto } from '../media/dto/create-media.dto';
 import { MediaFilterDto } from '../media/dto/media-filter.dto';
 import { MediaResponseDto } from '../media/dto/media-response.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { QueueService } from '../queue/queue.service';
 import { StorageService } from '../storage/storage.service';
 import { FileValidator } from './services/file-validator';
 import { MediaProcessor } from './services/media-processor';
@@ -13,17 +12,21 @@ import { plainToClass } from 'class-transformer';
 import { validate } from 'class-validator';
 import busboy from 'busboy';
 import { Request } from 'express';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bullmq';
+import { MediaConfig } from './config/media-config';
 
 @Injectable()
 export class MediaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
-    private readonly queueService: QueueService,
+    @InjectQueue('media') private readonly mediaQueue: Queue,
     private readonly fileValidator: FileValidator,
     private readonly mediaProcessor: MediaProcessor,
     private readonly queryBuilder: QueryBuilder,
     private readonly responseMapper: ResponseMapper,
+    private readonly mediaConfig: MediaConfig,
   ) {}
 
   async uploadMedia(req: Request, correlationId: string): Promise<MediaResponseDto> {
@@ -62,13 +65,14 @@ export class MediaService {
                   data: this.mediaProcessor.buildMediaCreateData(createMediaDto, objectKey),
                 });
 
-                const queueMessage = this.mediaProcessor.buildQueueMessage(
-                  createdMedia.id,
-                  objectKey,
-                  info.mimeType,
-                  correlationId,
-                );
-                await this.queueService.enqueue(queueMessage);
+                const jobPayload = {
+                  mediaId: createdMedia.id,
+                  objectKey: objectKey,
+                  mimeType: info.mimeType,
+                  correlationId: correlationId,
+                  requestedThumbnailSizes: this.mediaConfig.thumbnailSizes,
+                };
+                await this.mediaQueue.add('process', jobPayload);
 
                 return createdMedia;
               });

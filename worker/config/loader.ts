@@ -10,16 +10,11 @@ export function loadWorkerConfig(): WorkerConfig {
       rootUser: process.env.MINIO_ROOT_USER || WORKER_DEFAULTS.minio.rootUser,
       rootPassword: process.env.MINIO_ROOT_PASSWORD || WORKER_DEFAULTS.minio.rootPassword,
     },
-    sqs: {
-      region: process.env.AWS_REGION || WORKER_DEFAULTS.sqs.region,
-      endpoint: process.env.SQS_ENDPOINT || WORKER_DEFAULTS.sqs.endpoint,
-      queueName: process.env.SQS_QUEUE_NAME || WORKER_DEFAULTS.sqs.queueName,
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || WORKER_DEFAULTS.sqs.accessKeyId,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || WORKER_DEFAULTS.sqs.secretAccessKey,
-    },
     imagorVideo: {
       url: process.env.IMAGORVIDEO_URL || WORKER_DEFAULTS.imagorVideo.url,
     },
-    polling: WORKER_DEFAULTS.polling,
+    concurrency: process.env.WORKER_CONCURRENCY
+      ? parseInt(process.env.WORKER_CONCURRENCY, 10)
+      : WORKER_DEFAULTS.concurrency,
   };
 }

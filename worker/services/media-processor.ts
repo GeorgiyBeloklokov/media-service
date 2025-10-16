@@ -1,20 +1,17 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { DeleteMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { Prisma, PrismaClient, MediaStatus } from '@prisma/client';
 import axios from 'axios';
 import pino from 'pino';
 import * as path from 'path';
 
-import { WorkerQueueMessage, MediaRecord, ThumbnailData } from '../types';
+import { MediaJobPayload, MediaRecord, ThumbnailData } from '../types';
 import { fetchWithRetry } from '../utils/retry';
 
 export class MediaProcessor {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly s3Client: S3Client,
-    private readonly sqsClient: SQSClient,
     private readonly bucketName: string,
-    private readonly sqsQueueUrl: string,
     private readonly imagorVideoUrl: string,
     private readonly minioEndpoint: string,
     private readonly logger: pino.Logger,
@@ -22,8 +19,8 @@ export class MediaProcessor {
     this.logger.info('MediaProcessor initialized');
   }
 
-  async processMessage(message: WorkerQueueMessage, receiptHandle: string, logger: pino.Logger): Promise<void> {
-    const { mediaId, objectKey, requestedThumbnailSizes, jobId } = message;
+  async processMessage(message: MediaJobPayload, logger: pino.Logger): Promise<void> {
+    const { mediaId, objectKey, requestedThumbnailSizes } = message;
 
     try {
       const existingMedia = (await this.prisma.media.findUnique({
@@ -31,29 +28,27 @@ export class MediaProcessor {
       })) as MediaRecord | null;
 
       if (!existingMedia) {
-        logger.warn(`Media with ID ${mediaId} not found. Skipping processing for jobId: ${jobId}`);
-        await this.deleteMessage(receiptHandle, logger);
+        logger.warn(`Media with ID ${mediaId} not found. Skipping processing.`);
         return;
       }
 
+      // This check might be redundant if the job is only created once,
+      // but it's a good safeguard.
       if (existingMedia.status !== 'PENDING') {
-        logger.warn(
-          `Media ${mediaId} is already in status ${existingMedia.status}. Skipping processing for jobId: ${jobId}`,
-        );
-        await this.deleteMessage(receiptHandle, logger);
+        logger.warn(`Media ${mediaId} is already in status ${existingMedia.status}. Skipping processing.`);
         return;
       }
 
       await this.updateMediaStatus(mediaId, MediaStatus.PROCESSING, logger);
       const thumbnails = await this.processThumbnails(mediaId, objectKey, requestedThumbnailSizes, logger);
       await this.completeProcessing(mediaId, thumbnails, logger);
-      await this.deleteMessage(receiptHandle, logger);
 
-      logger.info(`SQS message deleted for mediaId: ${mediaId}`);
+      logger.info(`Job completed for mediaId: ${mediaId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(`Failed to process message for mediaId ${mediaId}: ${errorMessage}`);
       await this.updateMediaStatus(mediaId, MediaStatus.FAILED, logger);
+      throw error; // Important to re-throw for BullMQ retries
     }
   }
 
@@ -135,15 +130,5 @@ export class MediaProcessor {
       },
     });
     logger.info(`Media ${mediaId} processed and updated to READY.`);
-  }
-
-  private async deleteMessage(receiptHandle: string, logger: pino.Logger): Promise<void> {
-    await this.sqsClient.send(
-      new DeleteMessageCommand({
-        QueueUrl: this.sqsQueueUrl,
-        ReceiptHandle: receiptHandle,
-      }),
-    );
-    logger.info(`Deleted message with receipt handle: ${receiptHandle}`);
   }
 }

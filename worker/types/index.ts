@@ -1,11 +1,9 @@
-export interface WorkerQueueMessage {
+export interface MediaJobPayload {
   correlationId: string;
-  jobId: string;
   mediaId: number;
   objectKey: string;
   mimeType: string;
   requestedThumbnailSizes: ThumbnailSize[];
-  retryCount: number;
 }
 
 export interface MediaRecord {
@@ -46,20 +44,8 @@ export interface WorkerConfig {
     rootUser: string;
     rootPassword: string;
   };
-  sqs: {
-    region: string;
-    endpoint: string;
-    queueName: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-  };
   imagorVideo: {
     url: string;
   };
-  polling: {
-    maxMessages: number;
-    waitTimeSeconds: number;
-    visibilityTimeoutSeconds: number;
-    intervalSeconds: number;
-  };
+  concurrency: number;
 }

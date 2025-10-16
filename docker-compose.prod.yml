@@ -41,36 +41,6 @@ services:
     volumes:
       - minio-data:/data
 
-  localstack:
-    image: localstack/localstack:latest
-    restart: unless-stopped
-    ports:
-      - '4566:4566'
-      - '4510-4559:4510-4559'
-    environment:
-      SERVICES: s3,sqs
-      DEFAULT_REGION: ${AWS_REGION}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      DEBUG: 1
-    volumes:
-      - localstack-data:/var/lib/localstack
-    command: /usr/bin/localstack start -d
-
-  queue-init:
-    image: amazon/aws-cli:latest
-    depends_on:
-      - localstack
-    environment:
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_REGION}
-    volumes:
-      - ./scripts:/scripts
-    entrypoint: ['/bin/sh']
-    command: ['/scripts/init-localstack.sh']
-    restart: 'no'
-
   minio-init:
     image: minio/mc:latest
     depends_on:
@@ -125,11 +95,6 @@ services:
       MINIO_REGION: ${MINIO_REGION}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION}
-      SQS_ENDPOINT: http://localstack:4566
-      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME}
       IMAGORVIDEO_URL: http://imagorvideo:8080
       PORT: ${PORT}
       MAX_FILE_SIZE_IMAGE_MB: ${MAX_FILE_SIZE_IMAGE_MB}
@@ -144,16 +109,12 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-      localstack:
-        condition: service_started
       imagorvideo:
         condition: service_started
-      queue-init:
-        condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
     restart: unless-stopped
-    command: ["npm", "run", "start:prod"]
+    command: sh -c "(npm run start:prod) | npx pino-pretty --colorize --singleLine"
 
   worker:
     build:
@@ -168,11 +129,6 @@ services:
       MINIO_REGION: ${MINIO_REGION}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION}
-      SQS_ENDPOINT: http://localstack:4566
-      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME}
       IMAGORVIDEO_URL: http://imagorvideo:8080
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY}
     depends_on:
@@ -182,18 +138,13 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-      localstack:
-        condition: service_started
       imagorvideo:
         condition: service_started
-      queue-init:
-        condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
     restart: unless-stopped
-    command: ['node', 'dist/worker/main.js']
+    command: sh -c "node dist/worker/main.js | npx pino-pretty --colorize --singleLine"
 
 volumes:
   db-data:
   minio-data:
-  localstack-data:

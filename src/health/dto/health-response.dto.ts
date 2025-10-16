@@ -7,18 +7,15 @@ export interface ServiceStatus {
 }
 
 export class HealthResponseDto {
-  @ApiProperty({ description: 'Общий статус сервиса' })
+  @ApiProperty({ description: 'Overall status of the service' })
   status: 'healthy' | 'unhealthy';
 
-  @ApiProperty({ description: 'Время проверки' })
+  @ApiProperty({ description: 'The time of the check' })
   timestamp: string;
 
-  @ApiProperty({ description: 'Статус базы данных' })
+  @ApiProperty({ description: 'Status of the database' })
   database: ServiceStatus;
 
-  @ApiProperty({ description: 'Статус хранилища MinIO' })
+  @ApiProperty({ description: 'Status of the MinIO storage' })
   storage: ServiceStatus;
-
-  @ApiProperty({ description: 'Статус очереди SQS' })
-  queue: ServiceStatus;
 }
