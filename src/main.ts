@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
@@ -24,6 +24,11 @@ async function bootstrap() {
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
+
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Media Service API')

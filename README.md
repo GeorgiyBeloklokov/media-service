@@ -6,7 +6,7 @@ A comprehensive media processing service built with NestJS that handles file upl
 
 - File upload with validation and processing
 - S3-compatible storage (MinIO)
-- Asynchronous media processing via SQS queues
+- Asynchronous media processing via BullMQ and Redis
 - Automatic thumbnail generation
 - PostgreSQL database with Prisma ORM
 - Swagger API documentation
@@ -18,7 +18,7 @@ A comprehensive media processing service built with NestJS that handles file upl
 - **Backend API** and **Worker** as two main service components
 - **PostgreSQL** database with **Prisma ORM** for data persistence
 - **MinIO** S3-compatible object storage for file management
-- **SQS (Simple Queue Service)** for asynchronous task processing
+- **BullMQ and Redis** for asynchronous task processing
 - **ImagorVideo** service for thumbnail generation
 - **Docker** and **Docker Compose** for containerized deployment
 
@@ -38,11 +38,10 @@ cd media-service-0
 docker-compose up -d
 
 # Check logs
-docker-compose logs -f backend
+docker-compose logs backend
 ```
 
 ### Development vs. Production Environment
-
 The default `docker-compose.yml` file is configured for **development**. It uses local volumes to mount your source code into the containers, enabling hot-reloading for the `api` and `worker` services. This means changes to your code are reflected instantly without rebuilding the image.
 
 For a **production** environment, you should create a separate configuration file, for example `docker-compose.prod.yml`. This file should not mount source code volumes and should be optimized for a production deployment.
@@ -79,9 +78,9 @@ node dist/worker/main.js
 Access interactive Swagger documentation at **http://localhost:3000/api**
 
 ### Available Endpoints
-- `POST /media/upload` - Upload media file
-- `GET /media/:id` - Get media by ID
-- `GET /media` - Get media list with filtering and pagination
+- `POST /v1/media/upload` - Upload media file
+- `GET /v1/media/:id` - Get media by ID
+- `GET /v1/media` - Get media list with filtering and pagination
 - `GET /health` - Health check for all services
 
 ## Testing with Postman
@@ -95,13 +94,10 @@ docker-compose up -d
 # If you made code changes, rebuild
 docker-compose up -d --build
 
-# Apply Prisma migrations (if needed)
-docker exec media-service-0-backend-1 npx prisma migrate dev --name init --skip-generate --skip-seed
-```
 
-### A. Upload Media File (POST /media/upload)
+### A. Upload Media File (POST /v1/media/upload)
 
-**URL:** `http://localhost:3000/media/upload`  
+**URL:** `http://localhost:3000/v1/media/upload`  
 **Method:** `POST`  
 **Content-Type:** `multipart/form-data` (set automatically by Postman)
 
@@ -144,11 +140,11 @@ docker exec media-service-0-backend-1 npx prisma migrate dev --name init --skip-
 
 **Note:** Status will be `PENDING` initially. Thumbnails are generated asynchronously by the worker.
 
-### B. Get Media by ID (GET /media/:id)
+### B. Get Media by ID (GET /v1/media/:id)
 
-**URL:** `http://localhost:3000/media/{id}`  
+**URL:** `http://localhost:3000/v1/media/{id}`  
 **Method:** `GET`  
-**Example:** `http://localhost:3000/media/1`
+**Example:** `http://localhost:3000/v1/media/1`
 
 **Expected Result:** 200 OK (after worker processing)
 ```json
@@ -193,9 +189,9 @@ docker exec media-service-0-backend-1 npx prisma migrate dev --name init --skip-
 }
 ```
 
-### C. Get Media List (GET /media)
+### C. Get Media List (GET /v1/media)
 
-**URL:** `http://localhost:3000/media`  
+**URL:** `http://localhost:3000/v1/media`  
 **Method:** `GET`
 
 **Query Parameters:** You can add the following parameters for filtering and pagination:
@@ -209,9 +205,9 @@ docker exec media-service-0-backend-1 npx prisma migrate dev --name init --skip-
 *   `search`: `test` (search in name or description)
 
 **Example URLs:**
-- `http://localhost:3000/media?page=1&size=5`
-- `http://localhost:3000/media?mimeType=image/jpeg&sort=createdAt&order=desc`
-- `http://localhost:3000/media?uploadedAfter=2025-01-01&search=test`
+- `http://localhost:3000/v1/media?page=1&size=5`
+- `http://localhost:3000/v1/media?mimeType=image/jpeg&sort=createdAt&order=desc`
+- `http://localhost:3000/v1/media?uploadedAfter=2025-01-01&search=test`
 
 **Expected Result:** 200 OK
 ```json
@@ -283,10 +279,10 @@ docker exec media-service-0-backend-1 npx prisma migrate dev --name init --skip-
 
 ### Complete Test Scenario
 1. **Health Check**: `GET /health` → 200 OK
-2. **Upload File**: `POST /media/upload` with test image → 201 Created
-3. **Check List**: `GET /media` → status should be "PENDING"
+2. **Upload File**: `POST /v1/media/upload` with test image → 201 Created
+3. **Check List**: `GET /v1/media` → status should be "PENDING"
 4. **Wait 30-60 seconds** for worker processing
-5. **Check Again**: `GET /media/{id}` → status should be "READY" with thumbnails
+5. **Check Again**: `GET /v1/media/{id}` → status should be "READY" with thumbnails
 
 ### Automated Testing
 ```bash
@@ -314,7 +310,7 @@ chmod +x scripts/test-graceful-shutdown.sh
 
 1. **Upload** → File uploaded via API
 2. **Storage** → Original file saved to MinIO
-3. **Queue** → Processing job sent to SQS
+3. **Queue** → Processing job sent to BullMQ (in Redis)
 4. **Worker** → Background worker processes file
 5. **Thumbnail** → Generated via ImagorVideo service
 6. **Complete** → Status updated to READY
@@ -357,10 +353,10 @@ npm run format
 ## Troubleshooting
 
 ### Common Issues
-- **Port conflicts**: Ensure ports 3000, 5432, 9000, 9001, 4566, 8080 are available
+- **Port conflicts**: Ensure ports 3000, 5432, 9000, 9001, 8080 are available
 - **Docker issues**: Run `docker-compose down` and `docker-compose up -d`
 - **Database connection**: Check PostgreSQL container is healthy
-- **Worker not processing**: Check worker logs and SQS queue status
+- **Worker not processing**: Check worker logs and Redis connection
 
 ### Error Codes
 - **400**: Validation error - check required fields
@@ -387,15 +383,6 @@ npm run format
 - **Original files**: `media/originals/YYYY/MM/`
 - **Thumbnails**: `media/thumbnails/YYYY/MM/`
 
-### SQS Queue
-```bash
-# Check queue status
-docker exec media-service-0-localstack-1 awslocal sqs get-queue-attributes --queue-url http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/media-tasks --attribute-names All
-
-# Monitor messages
-docker exec media-service-0-localstack-1 awslocal sqs receive-message --queue-url http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/media-tasks
-```
-
 ### Logs
 ```bash
 # All services
@@ -405,3 +392,65 @@ docker-compose logs -f
 docker-compose logs backend
 docker-compose logs worker
 ```
+
+## Версионирование API
+
+> **Вопрос:** а как будет происходить процесс версионирования расскажи
+
+Процесс версионирования, который я предложил, работает следующим образом:
+
+### 1. Включение и настройка
+
+В файле `src/main.ts` мы добавляем строку:
+
+```typescript
+app.enableVersioning({
+  type: VersioningType.URI,
+  defaultVersion: '1',
+});
+```
+
+*   `type: VersioningType.URI`: Эта настройка указывает NestJS, что версия API будет передаваться как часть URL-адреса. Например: `/v1/`, `/v2/` и так далее.
+*   `defaultVersion: '1'`: Это версия по умолчанию. Если запрос придет на эндпоинт, у которого есть несколько версий, но в URL версия не указана, будет использована эта.
+
+### 2. Привязка версии к контроллеру
+
+Когда вы изменяете декоратор контроллера вот так:
+
+```typescript
+@Controller({ path: 'media', version: '1' })
+export class MediaController { ... }
+```
+
+Вы говорите NestJS: "Этот контроллер (`MediaController`) отвечает за обработку всех запросов, которые приходят на путь `/media` **и** относятся к версии `1`".
+
+В результате, когда поступает запрос, например, `GET /v1/media/123`, NestJS:
+1.  Видит префикс `/v1` и понимает, что это запрос к **версии 1**.
+2.  Ищет контроллер, который зарегистрирован для пути `media` и версии `1`.
+3.  Находит ваш `MediaController` и передает ему запрос.
+
+Запрос без версии (`GET /media/123`) вернет ошибку 404, потому что для него не найдется подходящего обработчика.
+
+### 3. Как добавлять новые версии (например, v2)
+
+Это самая важная часть, обеспечивающая обратную совместимость. Допустим, вы хотите кардинально изменить логику получения медиафайла.
+
+1.  Вы создаете новый контроллер, например, `MediaV2Controller`.
+2.  В нем вы указываете новую версию:
+    ```typescript
+    @Controller({ path: 'media', version: '2' })
+    export class MediaV2Controller {
+      // Новая логика, например, другой формат ответа
+      @Get(':id')
+      getMediaByIdV2(@Param('id') id: number) {
+        // ...
+      }
+    }
+    ```
+3.  Старый `MediaController` (v1) вы **не трогаете**.
+
+Теперь ваше приложение будет работать так:
+*   Запрос `GET /v1/media/123` будет обработан старым `MediaController`. Старые клиенты продолжат работать как раньше.
+*   Запрос `GET /v2/media/123` будет обработан новым `MediaV2Controller`. Новые клиенты смогут использовать новую функциональность.
+
+Таким образом, вы можете развивать API, не ломая интеграцию с уже существующими системами.

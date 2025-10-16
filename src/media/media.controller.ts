@@ -19,7 +19,7 @@ import { MediaService } from './media.service';
 import { CacheInterceptor } from '@nestjs/cache-manager';
 import { PinoLogger, Logger } from 'nestjs-pino';
 
-@Controller('media')
+@Controller({ path: 'media', version: '1' })
 export class MediaController {
   constructor(
     private readonly mediaService: MediaService,
