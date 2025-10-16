@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -16,10 +16,9 @@ services:
       timeout: 5s
       retries: 5
 
-
   redis:
     image: redis:alpine
-    restart: always
+    restart: unless-stopped
     ports:
       - '6379:6379'
     healthcheck:
@@ -30,7 +29,7 @@ services:
 
   minio:
     image: minio/minio
-    restart: always
+    restart: unless-stopped
     ports:
       - '9000:9000'
       - '9001:9001'
@@ -44,7 +43,7 @@ services:
 
   localstack:
     image: localstack/localstack:latest
-    restart: always
+    restart: unless-stopped
     ports:
       - '4566:4566'
       - '4510-4559:4510-4559'
@@ -88,26 +87,23 @@ services:
 
   imagorvideo:
     image: ghcr.io/cshum/imagorvideo:latest
-    restart: always
+    restart: unless-stopped
     ports:
       - '8080:8080'
     environment:
       IMAGOR_UNSAFE: 1
-      # S3 loader — откуда брать оригиналы
       IMAGOR_S3_LOADER_BUCKET: ${MINIO_BUCKET}
       IMAGOR_S3_LOADER_REGION: ${MINIO_REGION}
       IMAGOR_S3_LOADER_ENDPOINT: ${MINIO_ENDPOINT}
       IMAGOR_S3_LOADER_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       IMAGOR_S3_LOADER_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       IMAGOR_S3_LOADER_PATH_STYLE: true
-      # куда сохранять результаты (тоже в S3)
       IMAGOR_STORAGE_RESULT_STORAGE: s3
       IMAGOR_RESULT_STORAGE_PATH_STYLE: true
       IMAGOR_S3_STORAGE_BUCKET: ${MINIO_BUCKET}
       IMAGOR_S3_STORAGE_REGION: ${MINIO_REGION}
       IMAGOR_S3_STORAGE_ENDPOINT: ${MINIO_ENDPOINT}
       IMAGOR_S3_STORAGE_PATH_STYLE: true
-      # MinIO credentials
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
     depends_on:
@@ -117,13 +113,12 @@ services:
   backend:
     build:
       context: .
-    volumes:
-      - /app/node_modules
-      - ./logs:/app/logs
+      dockerfile: Dockerfile
     ports:
       - '3000:3000'
+    volumes:
+      - ./logs:/app/logs
     environment:
-      NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public&connection_limit=10
       MINIO_ENDPOINT: http://minio:9000
       MINIO_BUCKET: ${MINIO_BUCKET}
@@ -157,7 +152,7 @@ services:
         condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
-    restart: on-failure
+    restart: unless-stopped
     command: ["npm", "run", "start:prod"]
 
   worker:
@@ -165,10 +160,8 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     volumes:
-      - /app/node_modules
       - ./logs:/app/logs
     environment:
-      NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public&connection_limit=5
       MINIO_ENDPOINT: http://minio:9000
       MINIO_BUCKET: ${MINIO_BUCKET}
@@ -197,7 +190,7 @@ services:
         condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
-    restart: on-failure
+    restart: unless-stopped
     command: ['node', 'dist/worker/main.js']
 
 volumes:

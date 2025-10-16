@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Inject,
   Param,
   ParseIntPipe,
   Post,
@@ -16,10 +17,14 @@ import { MediaFilterDto } from './dto/media-filter.dto';
 import { MediaResponseDto } from './dto/media-response.dto';
 import { MediaService } from './media.service';
 import { CacheInterceptor } from '@nestjs/cache-manager';
+import { PinoLogger, Logger } from 'nestjs-pino';
 
 @Controller('media')
 export class MediaController {
-  constructor(private readonly mediaService: MediaService) {}
+  constructor(
+    private readonly mediaService: MediaService,
+    @Inject(Logger) private readonly logger: PinoLogger,
+  ) {}
 
   @Post('/upload')
   @ApiConsumes('multipart/form-data')
@@ -29,8 +34,9 @@ export class MediaController {
     description: 'Media file successfully uploaded',
     type: MediaResponseDto,
   })
-  async uploadMedia(@Req() req: Request): Promise<MediaResponseDto> {
-    return this.mediaService.uploadMedia(req);
+  async uploadMedia(@Req() req: Request & { id: string }): Promise<MediaResponseDto> {
+    const correlationId = req.id;
+    return this.mediaService.uploadMedia(req, correlationId);
   }
 
   @ApiOperation({ summary: 'Get media file information by ID' })

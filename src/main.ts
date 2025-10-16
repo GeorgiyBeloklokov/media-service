@@ -3,9 +3,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // Use pino-logger
+  app.useLogger(app.get(Logger));
 
   // Set security-related HTTP headers
   app.use(helmet());
@@ -30,17 +34,6 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
 
   await app.listen(process.env.PORT ?? 3000);
-
-  // Handle shutdown signals
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    void app.close();
-  });
-
-  process.on('SIGINT', () => {
-    console.log('SIGINT received, shutting down gracefully');
-    void app.close();
-  });
 }
 
 bootstrap().catch((error) => {

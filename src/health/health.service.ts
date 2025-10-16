@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { QueueService } from '../queue/queue.service';
@@ -6,13 +7,14 @@ import { HealthResponseDto, ServiceStatus } from './dto/health-response.dto';
 
 @Injectable()
 export class HealthService {
-  private readonly logger = new Logger(HealthService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly queueService: QueueService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(HealthService.name);
+  }
 
   async checkHealth(): Promise<HealthResponseDto> {
     const checks = await Promise.allSettled([this.checkDatabase(), this.checkStorage(), this.checkQueue()]);
@@ -44,7 +46,7 @@ export class HealthService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Database health check failed: ${errorMessage}`);
+      this.logger.error({ error: error as Error }, `Database health check failed: ${errorMessage}`);
       return {
         status: 'unhealthy',
         message: 'Database connection failed',
@@ -63,7 +65,7 @@ export class HealthService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Storage health check failed: ${errorMessage}`);
+      this.logger.error({ error: error as Error }, `Storage health check failed: ${errorMessage}`);
       return {
         status: 'unhealthy',
         message: 'Storage connection failed',
@@ -82,7 +84,7 @@ export class HealthService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Queue health check failed: ${errorMessage}`);
+      this.logger.error({ error: error as Error }, `Queue health check failed: ${errorMessage}`);
       return {
         status: 'unhealthy',
         message: 'Queue connection failed',

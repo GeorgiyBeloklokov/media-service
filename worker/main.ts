@@ -1,20 +1,47 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { SQSClient } from '@aws-sdk/client-sqs';
-import { Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import pino from 'pino';
 
 import { loadWorkerConfig } from './config/loader';
 import { MediaProcessor } from './services/media-processor';
 import { QueuePoller } from './services/queue-poller';
 import { WorkerGracefulShutdown } from './graceful-shutdown';
 
+const logger = pino({
+  level: 'info',
+  transport: {
+    targets: [
+      {
+        target: 'pino-roll',
+        level: 'info',
+        options: {
+          file: 'logs/worker.log',
+          frequency: 'daily',
+          size: '10m',
+          mkdir: true,
+          limit: { count: 7 },
+        },
+      },
+      {
+        target: 'pino-pretty',
+        level: 'info',
+        options: {
+          colorize: true,
+          singleLine: true,
+        },
+      },
+    ],
+  },
+});
+
 class Worker {
   private readonly prisma: PrismaClient;
   private readonly queuePoller: QueuePoller;
   private readonly gracefulShutdown: WorkerGracefulShutdown;
-  private readonly logger = new Logger(Worker.name);
 
-  constructor() {
+  constructor(private readonly logger: pino.Logger) {
+    this.logger.info('Initializing worker...');
     this.prisma = new PrismaClient();
     const config = loadWorkerConfig();
 
@@ -47,9 +74,10 @@ class Worker {
       sqsQueueUrl,
       config.imagorVideo.url,
       config.minio.endpoint,
+      this.logger,
     );
 
-    this.queuePoller = new QueuePoller(sqsClient, sqsQueueUrl, mediaProcessor);
+    this.queuePoller = new QueuePoller(sqsClient, sqsQueueUrl, mediaProcessor, this.logger);
 
     this.gracefulShutdown = new WorkerGracefulShutdown(this.prisma, () => this.queuePoller.stopPolling());
   }
@@ -59,27 +87,25 @@ class Worker {
   }
 
   async onApplicationShutdown() {
-    this.logger.log('Shutting down worker...');
+    this.logger.info('Shutting down worker...');
     await this.prisma.$disconnect();
-    this.logger.log('Prisma client disconnected.');
+    this.logger.info('Prisma client disconnected.');
   }
 }
 
-const worker = new Worker();
+const worker = new Worker(logger);
 
 async function bootstrapWorker() {
   try {
     await worker.startPolling();
   } catch (error) {
-    new Logger('WorkerBootstrap').error(
-      `Worker failed to start or encountered a critical error: ${(error as Error).message}`,
-    );
+    logger.error({ error: error as Error }, `Worker failed to start or encountered a critical error`);
     process.exit(1);
   }
 }
 
 bootstrapWorker().catch((error) => {
-  console.error('Failed to start worker:', error);
+  logger.fatal({ error: error as Error }, 'Failed to bootstrap worker');
   process.exit(1);
 });
 

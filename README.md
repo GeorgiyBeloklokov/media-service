@@ -41,6 +41,23 @@ docker-compose up -d
 docker-compose logs -f backend
 ```
 
+### Development vs. Production Environment
+
+The default `docker-compose.yml` file is configured for **development**. It uses local volumes to mount your source code into the containers, enabling hot-reloading for the `api` and `worker` services. This means changes to your code are reflected instantly without rebuilding the image.
+
+For a **production** environment, you should create a separate configuration file, for example `docker-compose.prod.yml`. This file should not mount source code volumes and should be optimized for a production deployment.
+
+**Key Differences in a `docker-compose.prod.yml`:**
+- **No source code volumes**: The application code is copied into the image during the build process.
+- **Production start command**: Services use `npm run start:prod` instead of `npm run start:dev`.
+- **Restart policy**: Services should have a restart policy like `restart: unless-stopped` to ensure they recover from crashes.
+
+**To run in production mode:**
+```bash
+# Create a docker-compose.prod.yml file and then run:
+docker-compose -f docker-compose.prod.yml up -d --build
+```
+
 ### Local Development
 ```bash
 # Install dependencies

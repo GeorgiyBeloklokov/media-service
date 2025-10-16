@@ -1,4 +1,5 @@
 export interface WorkerQueueMessage {
+  correlationId: string;
   jobId: string;
   mediaId: number;
   objectKey: string;

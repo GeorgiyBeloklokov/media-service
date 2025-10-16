@@ -9,9 +9,45 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
+import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'crypto';
 
 @Module({
   imports: [
+    LoggerModule.forRoot({
+      pinoHttp: {
+        genReqId: (req, res) => {
+          const existingId = req.id ?? req.headers['x-correlation-id'];
+          if (existingId) return existingId;
+          const id = randomUUID();
+          res.setHeader('X-Correlation-Id', id);
+          return id;
+        },
+        transport: {
+          targets: [
+            {
+              target: 'pino-roll',
+              level: 'info',
+              options: {
+                file: 'logs/api.log',
+                frequency: 'daily',
+                size: '10m',
+                mkdir: true,
+                limit: { count: 7 },
+              },
+            },
+            {
+              target: 'pino-pretty',
+              level: 'info',
+              options: {
+                singleLine: true,
+                colorize: true,
+              },
+            },
+          ],
+        },
+      },
+    }),
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([
       {

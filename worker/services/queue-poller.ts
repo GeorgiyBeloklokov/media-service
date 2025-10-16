@@ -1,22 +1,24 @@
 import { ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
-import { Logger } from '@nestjs/common';
+import pino from 'pino';
 
 import { WorkerQueueMessage } from '../types';
 import { WORKER_DEFAULTS } from '../config/defaults';
 import { MediaProcessor } from './media-processor';
 
 export class QueuePoller {
-  private readonly logger = new Logger(QueuePoller.name);
   private isPolling = false;
 
   constructor(
     private readonly sqsClient: SQSClient,
     private readonly sqsQueueUrl: string,
     private readonly mediaProcessor: MediaProcessor,
-  ) {}
+    private readonly logger: pino.Logger,
+  ) {
+    this.logger.info('QueuePoller initialized');
+  }
 
   async startPolling(): Promise<void> {
-    this.logger.log('Worker polling started...');
+    this.logger.info('Worker polling started...');
     this.isPolling = true;
 
     try {
@@ -40,7 +42,7 @@ export class QueuePoller {
   }
 
   stopPolling(): void {
-    this.logger.log('Stopping polling...');
+    this.logger.info('Stopping polling...');
     this.isPolling = false;
   }
 
@@ -62,9 +64,11 @@ export class QueuePoller {
         }
 
         const body = JSON.parse(message.Body) as WorkerQueueMessage;
-        this.logger.log(`Processing message for mediaId: ${body.mediaId}, jobId: ${body.jobId}`);
+        const childLogger = this.logger.child({ correlationId: body.correlationId });
 
-        await this.mediaProcessor.processMessage(body, message.ReceiptHandle);
+        childLogger.info(`Processing message for mediaId: ${body.mediaId}, jobId: ${body.jobId}`);
+
+        await this.mediaProcessor.processMessage(body, message.ReceiptHandle, childLogger);
       }
     }
   }

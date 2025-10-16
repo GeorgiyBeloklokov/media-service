@@ -1,9 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { SQSClient, SendMessageCommand, ReceiveMessageCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
+import { Injectable } from '@nestjs/common';
+import {
+  SQSClient,
+  SendMessageCommand,
+  ReceiveMessageCommand,
+  DeleteMessageCommand,
+  MessageAttributeValue,
+} from '@aws-sdk/client-sqs';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
+import { PinoLogger } from 'nestjs-pino';
 
 interface QueueMessage {
+  correlationId: string;
   jobId: string;
   mediaId: number;
   objectKey: string;
@@ -19,16 +27,19 @@ interface SQSMessageWithParsedBody {
   Body: QueueMessage | undefined;
   Attributes?: Record<string, string>;
   MD5OfMessageAttributes?: string;
-  MessageAttributes?: Record<string, any>;
+  MessageAttributes?: Record<string, MessageAttributeValue>;
 }
 
 @Injectable()
 export class QueueService {
   private readonly sqsClient: SQSClient;
-  private readonly logger = new Logger(QueueService.name);
   private readonly queueUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(QueueService.name);
     const region = this.configService.get<string>('AWS_REGION', 'us-east-1');
     const endpoint = this.configService.get<string>('SQS_ENDPOINT', 'http://localstack:4566');
     const queueName = this.configService.get<string>('SQS_QUEUE_NAME', 'media-tasks');
@@ -57,9 +68,9 @@ export class QueueService {
 
     try {
       await this.sqsClient.send(new SendMessageCommand(params));
-      this.logger.log(`Message enqueued for mediaId: ${message.mediaId}`);
+      this.logger.info({ mediaId: message.mediaId }, `Message enqueued`);
     } catch (error) {
-      this.logger.error(`Failed to enqueue message for mediaId ${message.mediaId}: ${(error as Error).message}`);
+      this.logger.error({ mediaId: message.mediaId, error: error as Error }, `Failed to enqueue message`);
       throw error;
     }
   }
@@ -78,7 +89,7 @@ export class QueueService {
     try {
       const { Messages } = await this.sqsClient.send(command);
       if (Messages && Messages.length > 0) {
-        this.logger.log(`Received ${Messages.length} messages from queue.`);
+        this.logger.info(`Received ${Messages.length} messages from queue.`);
         return Messages.map((msg) => ({
           ...msg,
           Body: msg.Body ? (JSON.parse(msg.Body) as QueueMessage) : undefined,
@@ -86,7 +97,7 @@ export class QueueService {
       }
       return [];
     } catch (error) {
-      this.logger.error(`Failed to pull messages from queue: ${(error as Error).message}`);
+      this.logger.error({ error: error as Error }, `Failed to pull messages from queue`);
       throw error;
     }
   }
@@ -99,9 +110,9 @@ export class QueueService {
 
     try {
       await this.sqsClient.send(command);
-      this.logger.log(`Message deleted with receipt handle: ${receiptHandle}`);
+      this.logger.info({ receiptHandle }, `Message deleted`);
     } catch (error) {
-      this.logger.error(`Failed to delete message with receipt handle ${receiptHandle}: ${(error as Error).message}`);
+      this.logger.error({ receiptHandle, error: error as Error }, `Failed to delete message`);
       throw error;
     }
   }

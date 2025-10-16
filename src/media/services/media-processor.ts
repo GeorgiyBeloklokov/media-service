@@ -1,12 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { MediaConfig, ThumbnailSize } from '../config/media-config';
 import { CreateMediaDto } from '../dto/create-media.dto';
 import { MediaStatus } from '../dto/media-response.dto';
+import { PinoLogger } from 'nestjs-pino';
 
 interface QueueMessage {
+  correlationId: string;
   jobId: string;
   mediaId: number;
   objectKey: string;
@@ -17,9 +19,12 @@ interface QueueMessage {
 
 @Injectable()
 export class MediaProcessor {
-  private readonly logger = new Logger(MediaProcessor.name);
-
-  constructor(private readonly config: MediaConfig) {}
+  constructor(
+    private readonly config: MediaConfig,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(MediaProcessor.name);
+  }
 
   generateObjectKey(originalname: string): string {
     const fileExtension = path.extname(originalname);
@@ -40,8 +45,9 @@ export class MediaProcessor {
     };
   }
 
-  buildQueueMessage(mediaId: number, objectKey: string, mimeType: string): QueueMessage {
+  buildQueueMessage(mediaId: number, objectKey: string, mimeType: string, correlationId: string): QueueMessage {
     return {
+      correlationId,
       jobId: uuidv4(),
       mediaId,
       objectKey,

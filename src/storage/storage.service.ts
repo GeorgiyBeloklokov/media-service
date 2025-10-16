@@ -1,19 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
+import { PinoLogger } from 'nestjs-pino';
 
 @Injectable()
 export class StorageService {
   private readonly s3Client: S3Client;
-  private readonly logger = new Logger(StorageService.name);
   private readonly bucketName: string;
   private readonly region: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(StorageService.name);
     this.region = this.configService.get<string>('MINIO_REGION', 'us-east-1');
     this.bucketName = this.configService.get<string>('MINIO_BUCKET', 'media');
     const endpoint = this.configService.get<string>('MINIO_ENDPOINT', 'http://minio:9000');
@@ -39,10 +43,10 @@ export class StorageService {
 
     try {
       await this.s3Client.send(command);
-      this.logger.log(`File uploaded successfully: ${key}`);
+      this.logger.info({ key }, `File uploaded successfully`);
       return `s3://${this.bucketName}/${key}`;
     } catch (error) {
-      this.logger.error(`Failed to upload file ${key}: ${(error as Error).message}`);
+      this.logger.error({ key, error: error as Error }, `Failed to upload file`);
       throw error;
     }
   }
@@ -60,10 +64,10 @@ export class StorageService {
 
     try {
       await upload.done();
-      this.logger.log(`File uploaded successfully via stream: ${key}`);
+      this.logger.info({ key }, `File uploaded successfully via stream`);
       return `s3://${this.bucketName}/${key}`;
     } catch (error) {
-      this.logger.error(`Failed to upload file ${key} via stream: ${(error as Error).message}`);
+      this.logger.error({ key, error: error as Error }, `Failed to upload file via stream`);
       throw error;
     }
   }
@@ -76,13 +80,13 @@ export class StorageService {
 
     try {
       const response = await this.s3Client.send(command);
-      this.logger.log(`File retrieved successfully: ${key}`);
+      this.logger.info({ key }, `File retrieved successfully`);
       if (!response.Body) {
         throw new NotFoundException(`File body is empty for key: ${key}`);
       }
       return Buffer.from(await response.Body.transformToByteArray());
     } catch (error) {
-      this.logger.error(`Failed to retrieve file ${key}: ${(error as Error).message}`);
+      this.logger.error({ key, error: error as Error }, `Failed to retrieve file`);
       throw error;
     }
   }
@@ -95,9 +99,9 @@ export class StorageService {
 
     try {
       await this.s3Client.send(command);
-      this.logger.log(`File deleted successfully: ${key}`);
+      this.logger.info({ key }, `File deleted successfully`);
     } catch (error) {
-      this.logger.error(`Failed to delete file ${key}: ${(error as Error).message}`);
+      this.logger.error({ key, error: error as Error }, `Failed to delete file`);
       throw error;
     }
   }
@@ -110,10 +114,10 @@ export class StorageService {
 
     try {
       const url = await getSignedUrl(this.s3Client, command, { expiresIn });
-      this.logger.log(`Presigned URL generated for ${key}`);
+      this.logger.info({ key }, `Presigned URL generated`);
       return url;
     } catch (error) {
-      this.logger.error(`Failed to generate presigned URL for ${key}: ${(error as Error).message}`);
+      this.logger.error({ key, error: error as Error }, `Failed to generate presigned URL`);
       throw error;
     }
   }

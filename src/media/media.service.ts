@@ -26,7 +26,7 @@ export class MediaService {
     private readonly responseMapper: ResponseMapper,
   ) {}
 
-  async uploadMedia(req: Request): Promise<MediaResponseDto> {
+  async uploadMedia(req: Request, correlationId: string): Promise<MediaResponseDto> {
     return new Promise((resolve, reject) => {
       const bb = busboy({ headers: req.headers });
       const fields: Record<string, string> = {};
@@ -62,7 +62,12 @@ export class MediaService {
                   data: this.mediaProcessor.buildMediaCreateData(createMediaDto, objectKey),
                 });
 
-                const queueMessage = this.mediaProcessor.buildQueueMessage(createdMedia.id, objectKey, info.mimeType);
+                const queueMessage = this.mediaProcessor.buildQueueMessage(
+                  createdMedia.id,
+                  objectKey,
+                  info.mimeType,
+                  correlationId,
+                );
                 await this.queueService.enqueue(queueMessage);
 
                 return createdMedia;

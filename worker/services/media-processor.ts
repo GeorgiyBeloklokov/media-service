@@ -1,16 +1,14 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { DeleteMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
-import { Logger } from '@nestjs/common';
 import { Prisma, PrismaClient, MediaStatus } from '@prisma/client';
 import axios from 'axios';
+import pino from 'pino';
 import * as path from 'path';
 
 import { WorkerQueueMessage, MediaRecord, ThumbnailData } from '../types';
 import { fetchWithRetry } from '../utils/retry';
 
 export class MediaProcessor {
-  private readonly logger = new Logger(MediaProcessor.name);
-
   constructor(
     private readonly prisma: PrismaClient,
     private readonly s3Client: S3Client,
@@ -19,9 +17,12 @@ export class MediaProcessor {
     private readonly sqsQueueUrl: string,
     private readonly imagorVideoUrl: string,
     private readonly minioEndpoint: string,
-  ) {}
+    private readonly logger: pino.Logger,
+  ) {
+    this.logger.info('MediaProcessor initialized');
+  }
 
-  async processMessage(message: WorkerQueueMessage, receiptHandle: string): Promise<void> {
+  async processMessage(message: WorkerQueueMessage, receiptHandle: string, logger: pino.Logger): Promise<void> {
     const { mediaId, objectKey, requestedThumbnailSizes, jobId } = message;
 
     try {
@@ -30,43 +31,45 @@ export class MediaProcessor {
       })) as MediaRecord | null;
 
       if (!existingMedia) {
-        this.logger.warn(`Media with ID ${mediaId} not found. Skipping processing for jobId: ${jobId}`);
-        await this.deleteMessage(receiptHandle);
+        logger.warn(`Media with ID ${mediaId} not found. Skipping processing for jobId: ${jobId}`);
+        await this.deleteMessage(receiptHandle, logger);
         return;
       }
 
       if (existingMedia.status !== 'PENDING') {
-        this.logger.warn(
+        logger.warn(
           `Media ${mediaId} is already in status ${existingMedia.status}. Skipping processing for jobId: ${jobId}`,
         );
-        await this.deleteMessage(receiptHandle);
+        await this.deleteMessage(receiptHandle, logger);
         return;
       }
 
-      await this.updateMediaStatus(mediaId, MediaStatus.PROCESSING);
-      const thumbnails = await this.processThumbnails(mediaId, objectKey, requestedThumbnailSizes);
-      await this.completeProcessing(mediaId, thumbnails);
-      await this.deleteMessage(receiptHandle);
+      await this.updateMediaStatus(mediaId, MediaStatus.PROCESSING, logger);
+      const thumbnails = await this.processThumbnails(mediaId, objectKey, requestedThumbnailSizes, logger);
+      await this.completeProcessing(mediaId, thumbnails, logger);
+      await this.deleteMessage(receiptHandle, logger);
 
-      this.logger.log(`SQS message deleted for mediaId: ${mediaId}`);
+      logger.info(`SQS message deleted for mediaId: ${mediaId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to process message for mediaId ${mediaId}: ${errorMessage}`);
-      await this.updateMediaStatus(mediaId, MediaStatus.FAILED);
+      logger.error(`Failed to process message for mediaId ${mediaId}: ${errorMessage}`);
+      await this.updateMediaStatus(mediaId, MediaStatus.FAILED, logger);
     }
   }
 
-  private async updateMediaStatus(mediaId: number, status: MediaStatus): Promise<void> {
+  private async updateMediaStatus(mediaId: number, status: MediaStatus, logger: pino.Logger): Promise<void> {
     await this.prisma.media.update({
       where: { id: mediaId },
       data: { status },
     });
+    logger.info(`Updated media status to ${status} for mediaId: ${mediaId}`);
   }
 
   private async processThumbnails(
     mediaId: number,
     objectKey: string,
     requestedThumbnailSizes: { width: number; height: number }[],
+    logger: pino.Logger,
   ): Promise<ThumbnailData[]> {
     // Download original file from MinIO
     const getObjectCommand = new GetObjectCommand({
@@ -79,7 +82,7 @@ export class MediaProcessor {
       throw new Error(`File body is empty for key: ${objectKey}`);
     }
 
-    this.logger.log(`Original file downloaded: ${objectKey}`);
+    logger.info(`Original file downloaded: ${objectKey}`);
 
     const thumbnails: ThumbnailData[] = [];
 
@@ -89,7 +92,7 @@ export class MediaProcessor {
       const fullMinioUrl = `${this.minioEndpoint}/${this.bucketName}/${objectKey}`;
       const imagorVideoEndpoint = `${this.imagorVideoUrl}/unsafe/${width}x${height}/${fullMinioUrl}`;
 
-      this.logger.log(`Generating thumbnail for ${objectKey} with ImagorVideo at: ${imagorVideoEndpoint}`);
+      logger.info(`Generating thumbnail for ${objectKey} with ImagorVideo at: ${imagorVideoEndpoint}`);
 
       const thumbnailResponse = await fetchWithRetry(() =>
         axios.get(imagorVideoEndpoint, { responseType: 'arraybuffer' }),
@@ -109,7 +112,7 @@ export class MediaProcessor {
         ),
       );
 
-      this.logger.log(`Thumbnail uploaded: ${thumbnailKey}`);
+      logger.info(`Thumbnail uploaded: ${thumbnailKey}`);
 
       thumbnails.push({
         url: thumbnailKey,
@@ -122,7 +125,7 @@ export class MediaProcessor {
     return thumbnails;
   }
 
-  private async completeProcessing(mediaId: number, thumbnails: ThumbnailData[]): Promise<void> {
+  private async completeProcessing(mediaId: number, thumbnails: ThumbnailData[], logger: pino.Logger): Promise<void> {
     await this.prisma.media.update({
       where: { id: mediaId },
       data: {
@@ -131,15 +134,16 @@ export class MediaProcessor {
         processedAt: new Date(),
       },
     });
-    this.logger.log(`Media ${mediaId} processed and updated to READY.`);
+    logger.info(`Media ${mediaId} processed and updated to READY.`);
   }
 
-  private async deleteMessage(receiptHandle: string): Promise<void> {
+  private async deleteMessage(receiptHandle: string, logger: pino.Logger): Promise<void> {
     await this.sqsClient.send(
       new DeleteMessageCommand({
         QueueUrl: this.sqsQueueUrl,
         ReceiptHandle: receiptHandle,
       }),
     );
+    logger.info(`Deleted message with receipt handle: ${receiptHandle}`);
   }
 }
