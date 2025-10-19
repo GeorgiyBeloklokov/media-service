@@ -10,12 +10,12 @@ export class CreateMediaDto {
   @Type(() => Number)
   uploaderId: number;
 
-  @ApiProperty({ description: 'File name' })
+  @ApiPropertyOptional({ description: 'File name' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Trim()
   @Escape()
-  name: string;
+  name?: string;
 
   @ApiPropertyOptional({ description: 'File description' })
   @IsOptional()
@@ -24,17 +24,17 @@ export class CreateMediaDto {
   @Escape()
   description?: string;
 
-  @ApiProperty({ description: 'File MIME type' })
+  @ApiPropertyOptional({ description: 'File MIME type' })
+  @IsOptional()
   @IsMimeType()
-  @IsNotEmpty()
-  mimeType: string;
+  mimeType?: string;
 
-  @ApiProperty({ description: 'File size in bytes' })
+  @ApiPropertyOptional({ description: 'File size in bytes' })
+  @IsOptional()
   @IsInt()
-  @IsNotEmpty()
   @Min(0)
   @Type(() => Number)
-  size: number;
+  size?: number;
 
   @ApiPropertyOptional({ description: 'Image width (for images)' })
   @IsOptional()

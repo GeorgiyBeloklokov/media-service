@@ -35,10 +35,10 @@ export class MediaProcessor {
   buildMediaCreateData(createMediaDto: CreateMediaDto, objectKey: string): Prisma.MediaCreateInput {
     return {
       uploaderId: Number(createMediaDto.uploaderId),
-      name: createMediaDto.name,
+      name: createMediaDto.name!,
       description: createMediaDto.description,
-      mimeType: createMediaDto.mimeType,
-      size: Number(createMediaDto.size),
+      mimeType: createMediaDto.mimeType!,
+      size: Number(createMediaDto.size!),
       duration: createMediaDto.duration,
       originalUrl: objectKey,
       status: MediaStatus.PENDING,

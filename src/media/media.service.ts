@@ -15,6 +15,7 @@ import { Request } from 'express';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bullmq';
 import { MediaConfig } from './config/media-config';
+import { PassThrough } from 'stream';
 
 @Injectable()
 export class MediaService {
@@ -42,42 +43,46 @@ export class MediaService {
         if (name === 'file') {
           const objectKey = this.mediaProcessor.generateObjectKey(info.filename);
 
-          file.on('error', reject);
+          const validationStream = new PassThrough();
+          file.pipe(validationStream);
 
-          this.storageService
-            .uploadStream(objectKey, file, info.mimeType)
-            .then(async () => {
-              const createMediaDto = plainToClass(CreateMediaDto, fields);
-              const errors = await validate(createMediaDto);
-              if (errors.length > 0) {
-                throw new BadRequestException(errors);
-              }
+          this.fileValidator
+            .validate(validationStream, info.mimeType)
+            .then(({ stream, size }) => {
+              this.storageService
+                .uploadStream(objectKey, stream, info.mimeType)
+                .then(async () => {
+                  const createMediaDto = plainToClass(CreateMediaDto, {
+                    ...fields,
+                    name: info.filename,
+                    mimeType: info.mimeType,
+                    size,
+                  });
+                  const errors = await validate(createMediaDto);
+                  if (errors.length > 0) {
+                    throw new BadRequestException(errors);
+                  }
 
-              this.fileValidator.validate({
-                ...createMediaDto,
-                mimeType: info.mimeType,
-                name: info.filename,
-                size: 0,
-              }); // Size validation is tricky with streams, skipping for now
+                  const media = await this.prisma.$transaction(async (prisma) => {
+                    const createdMedia = await prisma.media.create({
+                      data: this.mediaProcessor.buildMediaCreateData(createMediaDto, objectKey),
+                    });
 
-              const media = await this.prisma.$transaction(async (prisma) => {
-                const createdMedia = await prisma.media.create({
-                  data: this.mediaProcessor.buildMediaCreateData(createMediaDto, objectKey),
-                });
+                    const jobPayload = {
+                      mediaId: createdMedia.id,
+                      objectKey: objectKey,
+                      mimeType: info.mimeType,
+                      correlationId: correlationId,
+                      requestedThumbnailSizes: this.mediaConfig.thumbnailSizes,
+                    };
+                    await this.mediaQueue.add('process', jobPayload);
 
-                const jobPayload = {
-                  mediaId: createdMedia.id,
-                  objectKey: objectKey,
-                  mimeType: info.mimeType,
-                  correlationId: correlationId,
-                  requestedThumbnailSizes: this.mediaConfig.thumbnailSizes,
-                };
-                await this.mediaQueue.add('process', jobPayload);
+                    return createdMedia;
+                  });
 
-                return createdMedia;
-              });
-
-              resolve(this.responseMapper.mapMediaToResponseDto(media));
+                  resolve(this.responseMapper.mapMediaToResponseDto(media));
+                })
+                .catch(reject);
             })
             .catch(reject);
         } else {

@@ -7,12 +7,8 @@ export const UPLOAD_SCHEMA = {
     uploaderId: { type: 'number' },
     name: { type: 'string' },
     description: { type: 'string' },
-    mimeType: { type: 'string' },
-    size: { type: 'number' },
-    width: { type: 'number' },
-    height: { type: 'number' },
-    duration: { type: 'number' },
   },
+  required: ['file', 'uploaderId'],
 };
 
 class DynamicFileSizeValidator extends FileValidator<{ maxImageSize: number; maxVideoSize: number }> {

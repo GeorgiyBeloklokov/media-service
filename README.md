@@ -5,6 +5,7 @@ A comprehensive media processing service built with NestJS that handles file upl
 ## Features
 
 - File upload with validation and processing
+- Server-side file type and content validation
 - S3-compatible storage (MinIO)
 - Asynchronous media processing via BullMQ and Redis
 - Automatic thumbnail generation
@@ -104,13 +105,9 @@ docker-compose up -d --build
 **Request Body:** Select `form-data`. Add the following fields:
 *   `file` (type: `File`): Select an image (e.g., `.jpg`, `.png`, `.gif`) from your computer.
 *   `uploaderId` (type: `Text`): `1` (or any integer)
-*   `name` (type: `Text`): `My Test Image` (or any name)
 *   `description` (type: `Text`): `Test upload via Postman` (optional)
-*   `mimeType` (type: `Text`): `image/jpeg` (or `image/png`, `image/gif` depending on your file)
-*   `size` (type: `Text`): Specify file size in bytes. (You can find this in file properties. Important for server validation).
-*   `width` (type: `Text`): `1920` (optional, service will try to determine automatically)
-*   `height` (type: `Text`): `1080` (optional, service will try to determine automatically)
-*   `duration` (type: `Text`): `0` (for images)
+
+**Note:** The server will automatically detect the file's `name`, `mimeType`, and `size`.
 
 **File Constraints:**
 - Max file size: Images 10MB, Videos 50MB
@@ -309,11 +306,12 @@ chmod +x scripts/test-graceful-shutdown.sh
 ## File Processing Flow
 
 1. **Upload** → File uploaded via API
-2. **Storage** → Original file saved to MinIO
-3. **Queue** → Processing job sent to BullMQ (in Redis)
-4. **Worker** → Background worker processes file
-5. **Thumbnail** → Generated via ImagorVideo service
-6. **Complete** → Status updated to READY
+2. **Validation** → File type and content are validated on the server
+3. **Storage** → Original file saved to MinIO
+4. **Queue** → Processing job sent to BullMQ (in Redis)
+5. **Worker** → Background worker processes file
+6. **Thumbnail** → Generated via ImagorVideo service
+7. **Complete** → Status updated to READY
 
 ## Environment Variables
 

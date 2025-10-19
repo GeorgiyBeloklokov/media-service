@@ -1,20 +1,38 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { MediaConfig } from '../config/media-config';
-import { CreateMediaDto } from '../dto/create-media.dto';
+import sharp from 'sharp';
+import { Readable } from 'stream';
 
 @Injectable()
 export class FileValidator {
   constructor(private readonly config: MediaConfig) {}
 
-  validate(createMediaDto: CreateMediaDto): void {
-    const { mimeType, size, width, height } = createMediaDto;
+  async validate(stream: Readable, mimeType: string): Promise<{ stream: Readable; size: number }> {
+    const sharpInstance = sharp();
+    stream.pipe(sharpInstance);
 
-    if (mimeType.startsWith('image/')) {
-      this.validateImage(size, width, height);
-    } else if (mimeType.startsWith('video/')) {
-      this.validateVideo(size);
-    } else {
-      throw new BadRequestException('Unsupported file type');
+    let size = 0;
+    stream.on('data', (chunk) => (size += chunk.length));
+
+    try {
+      const metadata = await sharpInstance.metadata();
+      const originalMimeType = metadata.format ? `image/${metadata.format}` : undefined;
+
+      if (!originalMimeType || originalMimeType !== mimeType) {
+        throw new BadRequestException('Invalid file type');
+      }
+
+      if (mimeType.startsWith('image/')) {
+        this.validateImage(size, metadata.width, metadata.height);
+      } else if (mimeType.startsWith('video/')) {
+        this.validateVideo(size);
+      } else {
+        throw new BadRequestException('Unsupported file type');
+      }
+
+      return { stream, size };
+    } catch (err) {
+      throw new BadRequestException(`Invalid file: ${err.message}`);
     }
   }
 
