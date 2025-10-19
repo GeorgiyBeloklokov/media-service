@@ -1,4 +1,4 @@
-import { WorkerConfig } from '../types';
+import { WorkerConfig } from './schema';
 
 export const WORKER_DEFAULTS: WorkerConfig = {
   minio: {

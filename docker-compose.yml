@@ -63,14 +63,14 @@ services:
       - '8080:8080'
     environment:
       IMAGOR_UNSAFE: 1
-      # S3 loader — откуда брать оригиналы
+      # S3 loader — where get the originals
       IMAGOR_S3_LOADER_BUCKET: ${MINIO_BUCKET}
       IMAGOR_S3_LOADER_REGION: ${MINIO_REGION}
       IMAGOR_S3_LOADER_ENDPOINT: ${MINIO_ENDPOINT}
       IMAGOR_S3_LOADER_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       IMAGOR_S3_LOADER_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       IMAGOR_S3_LOADER_PATH_STYLE: true
-      # куда сохранять результаты (тоже в S3)
+      # S3 where to save the results
       IMAGOR_STORAGE_RESULT_STORAGE: s3
       IMAGOR_RESULT_STORAGE_PATH_STYLE: true
       IMAGOR_S3_STORAGE_BUCKET: ${MINIO_BUCKET}
@@ -100,7 +100,7 @@ services:
       MINIO_REGION: ${MINIO_REGION}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      IMAGORVIDEO_URL: http://imagorvideo:8080
+      IMAGORVIDEO_URL: ${IMAGORVIDEO_URL}
       PORT: ${PORT}
       MAX_FILE_SIZE_IMAGE_MB: ${MAX_FILE_SIZE_IMAGE_MB}
       MAX_FILE_SIZE_VIDEO_MB: ${MAX_FILE_SIZE_VIDEO_MB}

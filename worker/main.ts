@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import pino from 'pino';
 import { bullWorker, prismaClient } from './processor';
 import { WorkerGracefulShutdown } from './graceful-shutdown';

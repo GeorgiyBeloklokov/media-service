@@ -35,17 +35,3 @@ export interface ThumbnailSize {
   width: number;
   height: number;
 }
-
-export interface WorkerConfig {
-  minio: {
-    region: string;
-    bucket: string;
-    endpoint: string;
-    rootUser: string;
-    rootPassword: string;
-  };
-  imagorVideo: {
-    url: string;
-  };
-  concurrency: number;
-}

@@ -330,6 +330,8 @@ MAX_FILE_SIZE_VIDEO_MB=50
 THUMBNAIL_SIZES=[{"width":150,"height":150},{"width":300,"height":300}]
 ```
 
+Both the main API and the worker process validate their configuration on startup. If required environment variables are missing or have incorrect values, the service will fail to start and log a descriptive error message.
+
 ## Development Commands
 
 ```bash
