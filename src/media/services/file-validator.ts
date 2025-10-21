@@ -7,7 +7,7 @@ import { Readable } from 'stream';
 export class FileValidator {
   constructor(private readonly config: MediaConfig) {}
 
-  async validate(stream: Readable, mimeType: string): Promise<{ stream: Readable; size: number }> {
+  async validate(stream: Readable, mimeType: string): Promise<{ size: number }> {
     const sharpInstance = sharp();
     stream.pipe(sharpInstance);
 
@@ -30,7 +30,7 @@ export class FileValidator {
         throw new BadRequestException('Unsupported file type');
       }
 
-      return { stream, size };
+      return { size };
     } catch (err) {
       throw new BadRequestException(`Invalid file: ${err.message}`);
     }

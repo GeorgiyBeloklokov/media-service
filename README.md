@@ -306,8 +306,8 @@ chmod +x scripts/test-graceful-shutdown.sh
 ## File Processing Flow
 
 1. **Upload** → File uploaded via API
-2. **Validation** → File type and content are validated on the server
-3. **Storage** → Original file saved to MinIO
+2. **Stream Handling & Validation** → The original file stream is split into two parallel streams. One stream is used for server-side validation (file type, content, size, dimensions).
+3. **Storage** → Simultaneously, the other stream is used to upload the original file directly to MinIO.
 4. **Queue** → Processing job sent to BullMQ (in Redis)
 5. **Worker** → Background worker processes file
 6. **Thumbnail** → Generated via ImagorVideo service

@@ -44,13 +44,16 @@ export class MediaService {
           const objectKey = this.mediaProcessor.generateObjectKey(info.filename);
 
           const validationStream = new PassThrough();
+          const uploadStream = new PassThrough();
+
           file.pipe(validationStream);
+          file.pipe(uploadStream);
 
           this.fileValidator
             .validate(validationStream, info.mimeType)
-            .then(({ stream, size }) => {
+            .then(({ size }) => {
               this.storageService
-                .uploadStream(objectKey, stream, info.mimeType)
+                .uploadStream(objectKey, uploadStream, info.mimeType)
                 .then(async () => {
                   const createMediaDto = plainToClass(CreateMediaDto, {
                     ...fields,
