@@ -4,21 +4,21 @@ async function initDatabase() {
   console.log('🔄 Initializing database...');
   
   try {
-    // Проверяем статус миграций
+    // Check migration status
     execSync('npx prisma migrate status', { stdio: 'pipe' });
     console.log('✅ Database is already initialized');
   } catch (error) {
     console.log('📦 Database not initialized, creating schema...');
     
     try {
-      // Пытаемся применить существующие миграции
+      // Attempt to apply existing migrations
       execSync('npx prisma migrate deploy', { stdio: 'inherit' });
       console.log('✅ Migrations applied successfully');
     } catch (migrateError) {
       console.log('🔧 No migrations found, pushing schema directly...');
       
       try {
-        // Если миграций нет, пушим схему напрямую
+        // If no migrations, push schema directly
         execSync('npx prisma db push', { stdio: 'inherit' });
         console.log('✅ Database schema created successfully');
       } catch (pushError) {
@@ -28,7 +28,7 @@ async function initDatabase() {
     }
   }
   
-  // Генерируем Prisma Client
+  // Generate Prisma Client
   try {
     execSync('npx prisma generate', { stdio: 'inherit' });
     console.log('✅ Prisma Client generated successfully');

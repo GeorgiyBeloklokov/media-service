@@ -20,7 +20,7 @@ export class GracefulShutdownService implements OnApplicationShutdown {
     this.logger.info(`Received shutdown signal: ${signal}. Starting graceful shutdown...`);
 
     try {
-      // Закрываем соединения с базой данных
+      // Close database connections
       await this.prisma.$disconnect();
       this.logger.info('Database connections closed');
 

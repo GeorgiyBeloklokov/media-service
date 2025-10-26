@@ -1,10 +1,10 @@
 {
-  "name": "media-service-0",
+  "name": "media-service",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "A service for saving and creating thumbnails of images and videos",
+  "author": "Georgiy Beloklokov",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "build": "nest build",
     "build:worker": "tsc -p tsconfig.json --outDir dist",

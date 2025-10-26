@@ -33,7 +33,7 @@ A comprehensive media processing service built with NestJS that handles file upl
 ```bash
 # Clone and navigate to project
 git clone <repository-url>
-cd media-service-0
+cd media-service
 
 # Start all services
 docker-compose up -d --build
