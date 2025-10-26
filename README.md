@@ -36,27 +36,33 @@ git clone <repository-url>
 cd media-service-0
 
 # Start all services
-docker-compose up -d
+docker-compose up -d --build
 
 # Check logs
 docker-compose logs backend
 ```
 
 ### Development vs. Production Environment
-The default `docker-compose.yml` file is configured for **development**. It uses local volumes to mount your source code into the containers, enabling hot-reloading for the `api` and `worker` services. This means changes to your code are reflected instantly without rebuilding the image.
 
-For a **production** environment, you should create a separate configuration file, for example `docker-compose.prod.yml`. This file should not mount source code volumes and should be optimized for a production deployment.
+The project includes two Docker Compose files, `docker-compose.yml` and `docker-compose.prod.yml`. Both are configured to run the application in a production-like mode where the code is built into the image and hot-reloading is not enabled.
 
-**Key Differences in a `docker-compose.prod.yml`:**
-- **No source code volumes**: The application code is copied into the image during the build process.
-- **Production start command**: Services use `npm run start:prod` instead of `npm run start:dev`.
-- **Restart policy**: Services should have a restart policy like `restart: unless-stopped` to ensure they recover from crashes.
+- **`docker-compose.yml`**: This is the primary configuration file. It runs all services with a `restart: on-failure` policy.
+- **`docker-compose.prod.yml`**: This is a nearly identical, standalone configuration intended for production deployments. The main difference is it uses a `restart: unless-stopped` policy to ensure services recover from crashes or system reboots.
 
-**To run in production mode:**
+**To run the default configuration:**
 ```bash
-# Create a docker-compose.prod.yml file and then run:
+# Build and start all services
+docker-compose up -d --build
+```
+
+**To run using the production-specific configuration:**
+```bash
+# Use the docker-compose.prod.yml file to build and start
 docker-compose -f docker-compose.prod.yml up -d --build
 ```
+
+**Note on Code Changes**: Since neither configuration uses hot-reloading, you must rebuild the service's image after any code change for it to take effect:
+`docker-compose up -d --build <service_name>` (e.g., `backend` or `worker`).
 
 ### Local Development
 ```bash
@@ -317,15 +323,24 @@ chmod +x scripts/test-graceful-shutdown.sh
 
 Key configuration in `.env`:
 ```env
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password123
-POSTGRES_DB=media_service
-MINIO_ROOT_USER=admin
-MINIO_ROOT_PASSWORD=password123
-PORT=3000
-MAX_FILE_SIZE_IMAGE_MB=10
-MAX_FILE_SIZE_VIDEO_MB=50
-THUMBNAIL_SIZES=[{"width":150,"height":150},{"width":300,"height":300}]
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_DB=
+DATABASE_URL=
+MINIO_ROOT_USER=
+MINIO_ROOT_PASSWORD=
+MINIO_REGION=
+MINIO_BUCKET=
+MINIO_ENDPOINT=
+PORT=
+MAX_FILE_SIZE_IMAGE_MB=
+MAX_FILE_SIZE_VIDEO_MB=
+MAX_IMAGE_WIDTH=
+MAX_IMAGE_HEIGHT=
+THUMBNAIL_SIZES=
+WORKER_CONCURRENCY=
+IMAGORVIDEO_URL=
+NODE_ENV=
 ```
 
 Both the main API and the worker process validate their configuration on startup. If required environment variables are missing or have incorrect values, the service will fail to start and log a descriptive error message.
@@ -373,10 +388,10 @@ npm run format
 ## Monitoring & Debugging
 
 ### Performance
-- Small images (< 1MB): 10-30 seconds
-- Medium images (1-5MB): 30-60 seconds
-- Large images (5-10MB): 60-120 seconds
-- Videos: 60-180 seconds depending on size and duration
+- Small images (< 1MB): 1-10 seconds
+- Medium images (1-5MB): 10-20 seconds
+- Large images (5-10MB): 20-100 seconds
+- Videos: 3-180 seconds depending on size and duration
 
 ### MinIO Storage
 - **Console**: http://localhost:9001 (minioadmin/minioadmin)
@@ -393,15 +408,15 @@ docker-compose logs backend
 docker-compose logs worker
 ```
 
-## Версионирование API
+## API Versioning
 
-> **Вопрос:** а как будет происходить процесс версионирования расскажи
+> **Question:** How does the versioning process work?
 
-Процесс версионирования, который я предложил, работает следующим образом:
+The versioning process I proposed works as follows:
 
-### 1. Включение и настройка
+### 1. Enabling and Configuration
 
-В файле `src/main.ts` мы добавляем строку:
+In the `src/main.ts` file, we add the line:
 
 ```typescript
 app.enableVersioning({
@@ -410,47 +425,47 @@ app.enableVersioning({
 });
 ```
 
-*   `type: VersioningType.URI`: Эта настройка указывает NestJS, что версия API будет передаваться как часть URL-адреса. Например: `/v1/`, `/v2/` и так далее.
-*   `defaultVersion: '1'`: Это версия по умолчанию. Если запрос придет на эндпоинт, у которого есть несколько версий, но в URL версия не указана, будет использована эта.
+*   `type: VersioningType.URI`: This setting indicates to NestJS that the API version will be passed as part of the URL. For example: `/v1/`, `/v2/`, and so on.
+*   `defaultVersion: '1'`: This is the default version. If a request comes to an endpoint that has multiple versions, but the version is not specified in the URL, this one will be used.
 
-### 2. Привязка версии к контроллеру
+### 2. Binding the Version to the Controller
 
-Когда вы изменяете декоратор контроллера вот так:
+When you modify the controller decorator like this:
 
 ```typescript
 @Controller({ path: 'media', version: '1' })
 export class MediaController { ... }
 ```
 
-Вы говорите NestJS: "Этот контроллер (`MediaController`) отвечает за обработку всех запросов, которые приходят на путь `/media` **и** относятся к версии `1`".
+You are telling NestJS: "This controller (`MediaController`) is responsible for handling all requests that come to the `/media` path **and** belong to version `1`."
 
-В результате, когда поступает запрос, например, `GET /v1/media/123`, NestJS:
-1.  Видит префикс `/v1` и понимает, что это запрос к **версии 1**.
-2.  Ищет контроллер, который зарегистрирован для пути `media` и версии `1`.
-3.  Находит ваш `MediaController` и передает ему запрос.
+As a result, when a request comes in, for example, `GET /v1/media/123`, NestJS:
+1.  Sees the `/v1` prefix and understands that this is a request to **version 1**.
+2.  Searches for a controller that is registered for the `media` path and version `1`.
+3.  Finds your `MediaController` and passes the request to it.
 
-Запрос без версии (`GET /media/123`) вернет ошибку 404, потому что для него не найдется подходящего обработчика.
+A request without a version (`GET /media/123`) will return a 404 error because no suitable handler will be found for it.
 
-### 3. Как добавлять новые версии (например, v2)
+### 3. How to Add New Versions (e.g., v2)
 
-Это самая важная часть, обеспечивающая обратную совместимость. Допустим, вы хотите кардинально изменить логику получения медиафайла.
+This is the most important part, ensuring backward compatibility. Suppose you want to fundamentally change the logic for retrieving a media file.
 
-1.  Вы создаете новый контроллер, например, `MediaV2Controller`.
-2.  В нем вы указываете новую версию:
+1.  You create a new controller, for example, `MediaV2Controller`.
+2.  In it, you specify the new version:
     ```typescript
     @Controller({ path: 'media', version: '2' })
     export class MediaV2Controller {
-      // Новая логика, например, другой формат ответа
+      // New logic, for example, a different response format
       @Get(':id')
       getMediaByIdV2(@Param('id') id: number) {
         // ...
       }
     }
     ```
-3.  Старый `MediaController` (v1) вы **не трогаете**.
+3.  You **do not touch** the old `MediaController` (v1).
 
-Теперь ваше приложение будет работать так:
-*   Запрос `GET /v1/media/123` будет обработан старым `MediaController`. Старые клиенты продолжат работать как раньше.
-*   Запрос `GET /v2/media/123` будет обработан новым `MediaV2Controller`. Новые клиенты смогут использовать новую функциональность.
+Now your application will work as follows:
+*   A request `GET /v1/media/123` will be handled by the old `MediaController`. Old clients will continue to work as before.
+*   A request `GET /v2/media/123` will be handled by the new `MediaV2Controller`. New clients will be able to use the new functionality.
 
-Таким образом, вы можете развивать API, не ломая интеграцию с уже существующими системами.
+Thus, you can evolve the API without breaking integration with existing systems.

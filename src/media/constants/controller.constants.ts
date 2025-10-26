@@ -5,7 +5,6 @@ export const UPLOAD_SCHEMA = {
   properties: {
     file: { type: 'string', format: 'binary' },
     uploaderId: { type: 'number' },
-    name: { type: 'string' },
     description: { type: 'string' },
   },
   required: ['file', 'uploaderId'],
