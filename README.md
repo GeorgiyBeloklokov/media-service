@@ -2,6 +2,30 @@
 
 A comprehensive media processing service built with NestJS that handles file uploads, storage, and asynchronous media processing with thumbnail generation.
 
+## Technologies
+
+*   **Framework**: NestJS with TypeScript
+*   **Database**: PostgreSQL with Prisma ORM
+*   **Storage**: MinIO (S3-compatible object storage)
+*   **Queueing**: Redis-based BullMQ for asynchronous background jobs
+*   **Containerization**: Docker and Docker Compose
+
+## Implemented Features
+
+*   **Streaming Uploads**: Handles large file uploads efficiently using streams (`busboy`) to avoid high memory consumption.
+*   **Asynchronous Processing**: Media processing (thumbnail generation, metadata extraction) is handled asynchronously by a separate worker process using a BullMQ message queue.
+*   **Graceful Shutdown**: Both the API server and the worker implement graceful shutdown to finish in-progress tasks before exiting.
+*   **Resilient Job Queueing**: The BullMQ setup allows for automatic retries of failed jobs and tracking of failed jobs, providing resilience.
+*   **Health Checks**: A dedicated `/health` endpoint monitors the status of critical dependencies like the database and storage.
+*   **Structured and Correlated Logging**: Uses `pino` for structured JSON logging with a `correlationId` to trace requests from the API to the worker.
+*   **API Versioning**: API endpoints are versioned (e.g., `/v1/...`) to ensure backward compatibility.
+*   **Caching**: Implements a Redis-based caching layer for frequently accessed data, such as presigned URLs for media access.
+*   **Security Enhancements**:
+    *   **Rate Limiting**: Protects against brute-force attacks.
+    *   **Helmet**: Sets security-related HTTP headers.
+    *   **Input Sanitization**: Protects against XSS attacks.
+*   **Server-Side Validation**: Validates file content and type on the server to ensure uploads are what they claim to be.
+
 ## Features
 
 - File upload with validation and processing
